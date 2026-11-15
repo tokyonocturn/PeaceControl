@@ -39,7 +39,7 @@ contains no code or assets from them.
 
 ### Installer
 
-Download `PeaceControl-Setup-1.0.0.exe` and run it. The installer adds Start
+Download `PeaceControl-Setup-1.0.1.exe` and run it. The installer adds Start
 menu shortcuts and an uninstaller under *Apps & features*. It requires
 administrator rights because it installs into `Program Files`.
 
@@ -49,7 +49,7 @@ them to be removed.
 
 ### Portable
 
-Download `PeaceControl-1.0.0-portable.zip`, unpack it anywhere and run
+Download `PeaceControl-1.0.1-portable.zip`, unpack it anywhere and run
 `PeaceControl.exe`. The folder contains a `peacecontrol.portable` marker, so
 settings, presets and logs are stored in `data\` next to the executable. Move
 the folder to move the whole installation, including onto a USB stick.

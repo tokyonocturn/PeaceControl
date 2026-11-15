@@ -109,7 +109,7 @@ Equalizer APO itself behaves.
 
 ## Testing
 
-The workspace has 132 unit and integration tests (no network, no GUI):
+The workspace has 135 unit and integration tests (no network, no GUI):
 
 - model invariants, clamping, filter code round trips;
 - biquad response: peak gain at centre, −3 dB at cutoff, shelf behaviour, band

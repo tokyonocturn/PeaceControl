@@ -4,6 +4,36 @@ All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-11-15
+
+Closes the gaps found when checking the interface against the feature list.
+
+### Fixed
+
+- **Solo** now actually solos the selected band: every other band of the bank is
+  disabled, and pressing the same button restores them. Before, it only marked
+  the configuration as modified.
+- **Reverse channel order** is reachable from the Effects window. The renderer
+  already wrote the command, but no control set the flag.
+- **Echo repeats** can be set from 1 to 4, and the delay row is labelled
+  correctly instead of "Echoes".
+- The **surround stage** exposes front, centre, side, rear and subwoofer levels,
+  front and subwoofer delays and the bass crossover. Only widths, rear level and
+  subwoofer level were editable before.
+- The **global preamp** and the **preset description** are editable from the new
+  preset card in the inspector. Both were rendered and saved already, but the
+  interface offered no way to change them.
+- **Confirm before closing** works: closing the window with unsaved work asks
+  whether to save, close without saving or keep editing.
+- **Log level** is a setting that takes effect immediately, rather than a value
+  that was only read at startup.
+- Removed the unused `show_tooltips` and `language` settings, so the settings
+  file contains only options the application honours.
+
+### Tests
+
+- 135 tests, three of them new: solo toggling and log level parsing.
+
 ## [1.0.0] - 2026-11-15
 
 First public release: an independent, MIT licensed replacement for the Peace
