@@ -23,7 +23,7 @@ contains no code or assets from them.
 | --- | --- |
 | Equalizer | 1–31 bands per speaker bank, peak / shelf / pass / notch / all-pass shapes, per band frequency, gain and Q |
 | Response graph | Predicted response from the actual filters, draggable handles, hover read-out, preamp overlay |
-| Speakers | Nine channel targets plus custom ones (`all`, `L R`, `L C R`, `SUB`, `SL SR`, `RL RR`, any Equalizer APO channel list) |
+| Speakers | Any number of speaker banks, each aimed at any Equalizer APO channel list (`all`, `L R`, `L C R`, `SUB`, `SL SR`, `RL RR`, custom targets) |
 | Preamp | Global and per bank, with clipping awareness |
 | Effects | Bass and treble shelves, crossfeed, duophonic widening, echo, left/right swap, delays, 5.1 and 7.1 downmix, upmix, convolution (Graphic EQ), routing expressions |
 | Surround | Width, level and delay based stereo spread written as ordinary commands |
