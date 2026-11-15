@@ -117,8 +117,8 @@ impl Settings {
     }
 
     pub fn save(&self, path: &Path) -> Result<()> {
-        let text = serde_json::to_string_pretty(&self.sanitized())
-            .unwrap_or_else(|_| "{}".to_string());
+        let text =
+            serde_json::to_string_pretty(&self.sanitized()).unwrap_or_else(|_| "{}".to_string());
         fsutil::write_atomic(path, &text)
     }
 

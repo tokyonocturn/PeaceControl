@@ -5,7 +5,7 @@
 //! horizontally while holding Shift for frequency.
 
 use crate::theme::Palette;
-use egui::{Align2, Color32, Rounding, FontId, Pos2, Rect, Sense, Stroke, Ui, Vec2};
+use egui::{Align2, Color32, FontId, Pos2, Rect, Rounding, Sense, Stroke, Ui, Vec2};
 use peace_control_core::dsp;
 use peace_control_core::model::Band;
 use peace_control_core::render::num;
@@ -63,7 +63,7 @@ pub fn freq_label(freq: f32) -> String {
 #[allow(clippy::too_many_arguments)]
 pub fn show(
     ui: &mut Ui,
-    bands: &mut Vec<Band>,
+    bands: &mut [Band],
     selected: &mut Option<usize>,
     preamp_db: f32,
     show_preamp: bool,
@@ -72,7 +72,8 @@ pub fn show(
     palette: &Palette,
 ) -> GraphOutcome {
     let width = ui.available_width().max(120.0);
-    let (outer, response) = ui.allocate_exact_size(Vec2::new(width, height), Sense::click_and_drag());
+    let (outer, response) =
+        ui.allocate_exact_size(Vec2::new(width, height), Sense::click_and_drag());
     let rect = outer.shrink2(Vec2::new(34.0, 12.0));
     let painter = ui.painter_at(outer);
 
@@ -97,7 +98,14 @@ pub fn show(
         let is_zero = db.abs() < 0.01;
         painter.line_segment(
             [Pos2::new(rect.left(), y), Pos2::new(rect.right(), y)],
-            Stroke::new(if is_zero { 1.2_f32 } else { 0.6_f32 }, if is_zero { palette.border_strong } else { palette.grid }),
+            Stroke::new(
+                if is_zero { 1.2_f32 } else { 0.6_f32 },
+                if is_zero {
+                    palette.border_strong
+                } else {
+                    palette.grid
+                },
+            ),
         );
         painter.text(
             Pos2::new(rect.left() - 8.0, y),
@@ -162,7 +170,7 @@ pub fn show(
         for index in 0..points.len().saturating_sub(1) {
             let a = index as u32;
             let b = a + 1;
-            let c = b + base_start - 0;
+            let c = b + base_start;
             let d = a + base_start;
             mesh.add_triangle(a, b, c);
             mesh.add_triangle(a, c, d);
@@ -176,7 +184,7 @@ pub fn show(
 
     // Band handles.
     let pointer = response.hover_pos();
-    let hovered: Option<usize>;
+
     let mut nearest: Option<(usize, f32)> = None;
     for (index, band) in bands.iter().enumerate() {
         let pos = Pos2::new(
@@ -201,9 +209,13 @@ pub fn show(
             painter.circle_filled(pos, 9.0, palette.accent_alpha(40));
         }
         painter.circle_filled(pos, if is_selected { 5.5 } else { 4.0 }, color);
-        painter.circle_stroke(pos, if is_selected { 5.5 } else { 4.0 }, Stroke::new(1.0_f32, palette.bg));
+        painter.circle_stroke(
+            pos,
+            if is_selected { 5.5 } else { 4.0 },
+            Stroke::new(1.0_f32, palette.bg),
+        );
     }
-    hovered = nearest.map(|(index, _)| index);
+    let hovered: Option<usize> = nearest.map(|(index, _)| index);
     if hovered.is_some() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
@@ -227,10 +239,10 @@ pub fn show(
             if let Some(band) = bands.get_mut(index) {
                 let shift = ui.input(|input| input.modifiers.shift);
                 if shift {
-                    band.freq_hz = peace_control_core::model::round_frequency(x_to_freq(rect, pointer.x));
+                    band.freq_hz =
+                        peace_control_core::model::round_frequency(x_to_freq(rect, pointer.x));
                 } else {
-                    band.gain_db = y_to_db(rect, pointer.y, range_db)
-                        .clamp(-30.0, 30.0);
+                    band.gain_db = y_to_db(rect, pointer.y, range_db).clamp(-30.0, 30.0);
                 }
                 outcome.changed = true;
             }

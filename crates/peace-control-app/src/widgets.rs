@@ -1,7 +1,7 @@
 //! Reusable interface pieces: the band slider strip, chips and section headers.
 
 use crate::theme::{Palette, CARD_RADIUS, SMALL_RADIUS};
-use egui::{Align2, Color32, Rounding, FontId, Pos2, Rect, Response, Sense, Stroke, Ui, Vec2};
+use egui::{Align2, Color32, FontId, Pos2, Rect, Response, Rounding, Sense, Stroke, Ui, Vec2};
 use peace_control_core::model::{Band, MAX_GAIN_DB, MIN_GAIN_DB};
 
 /// Interaction result of the band strip.
@@ -45,10 +45,8 @@ pub fn band_strip(
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 2.0;
                 for (index, band) in bands.iter_mut().enumerate() {
-                    let (rect, response) = ui.allocate_exact_size(
-                        Vec2::new(per_band, height),
-                        Sense::click_and_drag(),
-                    );
+                    let (rect, response) = ui
+                        .allocate_exact_size(Vec2::new(per_band, height), Sense::click_and_drag());
                     let painter = ui.painter_at(rect);
                     let is_selected = *selected == Some(index);
                     if is_selected {
@@ -63,10 +61,7 @@ pub fn band_strip(
                     let value_height = 14.0;
                     let track = Rect::from_min_max(
                         Pos2::new(rect.center().x - 2.0, rect.top() + value_height + 6.0),
-                        Pos2::new(
-                            rect.center().x + 2.0,
-                            rect.bottom() - label_height - 6.0,
-                        ),
+                        Pos2::new(rect.center().x + 2.0, rect.bottom() - label_height - 6.0),
                     );
                     let center_y = track.center().y;
                     let half = track.height() / 2.0;
@@ -272,10 +267,15 @@ pub fn primary_button(ui: &mut Ui, label: &str, enabled: bool, palette: &Palette
     };
     ui.add_enabled(
         enabled,
-        egui::Button::new(egui::RichText::new(label).size(12.5).strong().color(text_color))
-            .fill(fill)
-            .rounding(CARD_RADIUS)
-            .min_size(Vec2::new(0.0, 30.0)),
+        egui::Button::new(
+            egui::RichText::new(label)
+                .size(12.5)
+                .strong()
+                .color(text_color),
+        )
+        .fill(fill)
+        .rounding(CARD_RADIUS)
+        .min_size(Vec2::new(0.0, 30.0)),
     )
 }
 

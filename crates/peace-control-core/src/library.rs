@@ -80,8 +80,7 @@ fn subwoofer_crossover() -> Preset {
     let mut preset = Preset::with_bands(1);
     preset.name = "Subwoofer Crossover 80 Hz".to_string();
     preset.description =
-        "Splits the signal: low pass to the subwoofer, high pass to the main speakers."
-            .to_string();
+        "Splits the signal: low pass to the subwoofer, high pass to the main speakers.".to_string();
     preset.preamp_db = -2.0;
     preset.speakers = vec![
         SpeakerEq {
@@ -91,7 +90,7 @@ fn subwoofer_crossover() -> Preset {
             bands: vec![Band {
                 freq_hz: 80.0,
                 gain_db: 0.0,
-                q: 0.707,
+                q: std::f32::consts::FRAC_1_SQRT_2,
                 filter: FilterType::LowPassQ,
                 enabled: true,
             }],
@@ -103,7 +102,7 @@ fn subwoofer_crossover() -> Preset {
             bands: vec![Band {
                 freq_hz: 80.0,
                 gain_db: 0.0,
-                q: 0.707,
+                q: std::f32::consts::FRAC_1_SQRT_2,
                 filter: FilterType::HighPassQ,
                 enabled: true,
             }],
@@ -115,7 +114,8 @@ fn subwoofer_crossover() -> Preset {
 fn wide_stereo() -> Preset {
     let mut preset = Preset::with_bands(5);
     preset.name = "Wide Stereo".to_string();
-    preset.description = "Blends the channels slightly for a wider image on headphones.".to_string();
+    preset.description =
+        "Blends the channels slightly for a wider image on headphones.".to_string();
     preset.effects.fake_stereo = true;
     preset.effects.fake_stereo_delay_ms = 18.0;
     preset.effects.fake_stereo_freq_hz = 900.0;
@@ -178,7 +178,9 @@ mod tests {
         let presets = builtin_presets();
         assert!(presets.len() >= 8);
         assert!(presets.iter().all(|preset| !preset.name.trim().is_empty()));
-        assert!(presets.iter().all(|preset| !preset.description.trim().is_empty()));
+        assert!(presets
+            .iter()
+            .all(|preset| !preset.description.trim().is_empty()));
     }
 
     #[test]

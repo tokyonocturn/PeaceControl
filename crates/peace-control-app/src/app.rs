@@ -3,9 +3,7 @@
 use crate::engine::Engine;
 use crate::theme::{self, Palette};
 use crate::{brand, dialogs, graph, platform, widgets};
-use eframe::egui::{
-    self, Align, Color32, Rounding, Layout, RichText, Sense, Stroke, Vec2,
-};
+use eframe::egui::{self, Align, Color32, Layout, RichText, Rounding, Sense, Stroke, Vec2};
 use peace_control_core::model::{
     log_bands, FilterType, Preset, MAX_BANDS, MAX_FREQ_HZ, MIN_FREQ_HZ,
 };
@@ -78,9 +76,9 @@ pub struct Windows {
 
 /// Nested action, applied after the interface closure finished borrowing.
 enum DeferredAction {
-    LoadPreset(String),
-    DeletePreset(String),
-    DuplicatePreset(String),
+    Load(String),
+    Delete(String),
+    Duplicate(String),
 }
 
 pub struct PeaceApp {
@@ -199,11 +197,8 @@ impl PeaceApp {
             Theme::System => crate::platform::system_prefers_dark(),
         };
         let mut palette = Palette::for_dark(dark);
-        palette.accent = Color32::from_rgb(
-            settings.accent[0],
-            settings.accent[1],
-            settings.accent[2],
-        );
+        palette.accent =
+            Color32::from_rgb(settings.accent[0], settings.accent[1], settings.accent[2]);
         palette.accent_text = if dark {
             Color32::from_rgb(6, 24, 24)
         } else {
@@ -261,7 +256,9 @@ impl PeaceApp {
     }
 
     pub(crate) fn clamp_selection(&mut self) {
-        self.speaker = self.speaker.min(self.preset.speakers.len().saturating_sub(1));
+        self.speaker = self
+            .speaker
+            .min(self.preset.speakers.len().saturating_sub(1));
         let band_count = self.preset.speakers[self.speaker].bands.len();
         self.selected_band = self
             .selected_band
@@ -329,7 +326,10 @@ impl PeaceApp {
                 let _ = self.settings.save(&self.paths.settings_file());
                 self.refresh_files();
                 self.status(
-                    format!("Saved to {}", path.file_name().unwrap_or_default().to_string_lossy()),
+                    format!(
+                        "Saved to {}",
+                        path.file_name().unwrap_or_default().to_string_lossy()
+                    ),
                     StatusKind::Success,
                 );
             }
@@ -382,13 +382,20 @@ impl PeaceApp {
         if self.last_edit.elapsed().as_secs() < 2 {
             return;
         }
-        let source = self.source_path.as_ref().map(|path| path.display().to_string());
+        let source = self
+            .source_path
+            .as_ref()
+            .map(|path| path.display().to_string());
         let _ = session::save(&self.paths.draft_file(), &self.preset, source.as_deref());
     }
 
     pub(crate) fn add_speaker(&mut self) {
         self.push_history();
-        let targets = if self.preset.speakers.len() % 2 == 0 { "L" } else { "R" };
+        let targets = if self.preset.speakers.len() % 2 == 0 {
+            "L"
+        } else {
+            "R"
+        };
         let index = self.preset.add_speaker(targets);
         self.speaker = index;
         self.selected_band = None;
@@ -451,7 +458,10 @@ impl PeaceApp {
                 self.analyse_import();
                 self.windows.import = true;
             }
-            Err(error) => self.status(format!("Could not read the file: {error}"), StatusKind::Error),
+            Err(error) => self.status(
+                format!("Could not read the file: {error}"),
+                StatusKind::Error,
+            ),
         }
     }
 
@@ -619,7 +629,10 @@ impl PeaceApp {
 
     pub(crate) fn add_band(&mut self) {
         if self.preset.speakers[self.speaker].bands.len() >= MAX_BANDS {
-            self.status(format!("A bank can hold at most {MAX_BANDS} bands"), StatusKind::Warning);
+            self.status(
+                format!("A bank can hold at most {MAX_BANDS} bands"),
+                StatusKind::Warning,
+            );
             return;
         }
         self.push_history();
@@ -703,7 +716,9 @@ impl eframe::App for PeaceApp {
         let shortcuts = ctx.input(|input| ShortcutState {
             save: input.modifiers.command && input.key_pressed(egui::Key::S),
             apply: input.modifiers.command && input.key_pressed(egui::Key::E),
-            undo: input.modifiers.command && !input.modifiers.shift && input.key_pressed(egui::Key::Z),
+            undo: input.modifiers.command
+                && !input.modifiers.shift
+                && input.key_pressed(egui::Key::Z),
             redo: input.modifiers.command
                 && ((input.modifiers.shift && input.key_pressed(egui::Key::Z))
                     || input.key_pressed(egui::Key::Y)),
@@ -780,7 +795,7 @@ impl eframe::App for PeaceApp {
             && self.dirty
             && self.last_edit.elapsed().as_millis() > 500
             && self.applied_at.is_some()
-            && self.windows.effects == false
+            && !self.windows.effects
         {
             // Only rewrite while the pointer is up, so dragging never hammers
             // the audio engine with intermediate files.
@@ -804,7 +819,10 @@ impl eframe::App for PeaceApp {
             let _ = self.engine.snapshot(self.settings.max_backups);
         }
         if self.dirty {
-            let source = self.source_path.as_ref().map(|path| path.display().to_string());
+            let source = self
+                .source_path
+                .as_ref()
+                .map(|path| path.display().to_string());
             let _ = session::save(&self.paths.draft_file(), &self.preset, source.as_deref());
         } else {
             let _ = session::clear(&self.paths.draft_file());
@@ -851,10 +869,8 @@ impl PeaceApp {
                                 self.note_edit(false);
                             }
                             if self.dirty {
-                                ui.label(
-                                    RichText::new("●").size(9.0).color(palette.warn),
-                                )
-                                .on_hover_text("Unsaved changes");
+                                ui.label(RichText::new("●").size(9.0).color(palette.warn))
+                                    .on_hover_text("Unsaved changes");
                             }
                         });
                         ui.label(
@@ -1018,21 +1034,21 @@ impl PeaceApp {
 
                     response.context_menu(|ui| {
                         if ui.button("Load").clicked() {
-                            action = Some(DeferredAction::LoadPreset(entry.name.clone()));
+                            action = Some(DeferredAction::Load(entry.name.clone()));
                             ui.close_menu();
                         }
                         if ui.button("Duplicate").clicked() {
-                            action = Some(DeferredAction::DuplicatePreset(entry.name.clone()));
+                            action = Some(DeferredAction::Duplicate(entry.name.clone()));
                             ui.close_menu();
                         }
                         if ui.button("Delete").clicked() {
-                            action = Some(DeferredAction::DeletePreset(entry.name.clone()));
+                            action = Some(DeferredAction::Delete(entry.name.clone()));
                             ui.close_menu();
                         }
                     });
 
                     if response.clicked() {
-                        action = Some(DeferredAction::LoadPreset(entry.name.clone()));
+                        action = Some(DeferredAction::Load(entry.name.clone()));
                     }
                     ui.add_space(4.0);
                 }
@@ -1047,9 +1063,9 @@ impl PeaceApp {
 
         if let Some(action) = action {
             match action {
-                DeferredAction::LoadPreset(name) => self.load_preset_named(&name),
-                DeferredAction::DeletePreset(name) => self.delete_preset(&name),
-                DeferredAction::DuplicatePreset(name) => self.duplicate_preset(&name),
+                DeferredAction::Load(name) => self.load_preset_named(&name),
+                DeferredAction::Delete(name) => self.delete_preset(&name),
+                DeferredAction::Duplicate(name) => self.duplicate_preset(&name),
             }
         }
 
@@ -1064,11 +1080,7 @@ impl PeaceApp {
         for (index, speaker) in self.preset.speakers.iter().enumerate() {
             let selected = index == self.speaker;
             let flat = speaker.is_flat();
-            let label = format!(
-                "{}{}",
-                speaker.name,
-                if flat { "" } else { "  *" }
-            );
+            let label = format!("{}{}", speaker.name, if flat { "" } else { "  *" });
             if ui
                 .selectable_label(
                     selected,
@@ -1141,11 +1153,7 @@ impl PeaceApp {
             .inner_margin(egui::Margin::symmetric(12.0, 8.0))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(
-                        RichText::new("Preamp")
-                            .size(12.0)
-                            .color(palette.muted),
-                    );
+                    ui.label(RichText::new("Preamp").size(12.0).color(palette.muted));
                     let mut value = preamp;
                     if ui
                         .add(
@@ -1163,10 +1171,7 @@ impl PeaceApp {
                         self.last_edit = Instant::now();
                     }
                     if ui
-                        .add(
-                            egui::Slider::new(&mut value, -24.0..=12.0)
-                                .show_value(false),
-                        )
+                        .add(egui::Slider::new(&mut value, -24.0..=12.0).show_value(false))
                         .changed()
                     {
                         self.preset.speakers[speaker_index].preamp_db = value;
@@ -1237,12 +1242,7 @@ impl PeaceApp {
                         {
                             self.settings.preamp_in_graph = self.show_preamp;
                         }
-                        widgets::chip(
-                            ui,
-                            &format!("predicted response"),
-                            &palette,
-                            false,
-                        );
+                        widgets::chip(ui, "predicted response", &palette, false);
                     });
                 });
 
@@ -1282,11 +1282,7 @@ impl PeaceApp {
             .inner_margin(egui::Margin::symmetric(8.0, 6.0))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label(
-                        RichText::new("Bands")
-                            .size(11.0)
-                            .color(palette.muted),
-                    );
+                    ui.label(RichText::new("Bands").size(11.0).color(palette.muted));
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if widgets::ghost_button(ui, "+", &palette)
                             .on_hover_text("Add a band")
@@ -1349,12 +1345,15 @@ impl PeaceApp {
             .show(ui, |ui| {
                 match band_index {
                     Some(index) => {
-                        if let Some(band) = self.preset.speakers[speaker_index].bands.get_mut(index) {
+                        if let Some(band) = self.preset.speakers[speaker_index].bands.get_mut(index)
+                        {
                             egui::Grid::new("band-editor")
                                 .num_columns(2)
                                 .spacing([8.0, 6.0])
                                 .show(ui, |ui| {
-                                    ui.label(RichText::new("Frequency").size(11.0).color(palette.muted));
+                                    ui.label(
+                                        RichText::new("Frequency").size(11.0).color(palette.muted),
+                                    );
                                     let mut freq = band.freq_hz;
                                     if ui
                                         .add(
@@ -1386,7 +1385,9 @@ impl PeaceApp {
                                     }
                                     ui.end_row();
 
-                                    ui.label(RichText::new("Quality").size(11.0).color(palette.muted));
+                                    ui.label(
+                                        RichText::new("Quality").size(11.0).color(palette.muted),
+                                    );
                                     if ui
                                         .add(
                                             egui::DragValue::new(&mut band.q)
@@ -1400,7 +1401,9 @@ impl PeaceApp {
                                     }
                                     ui.end_row();
 
-                                    ui.label(RichText::new("Filter").size(11.0).color(palette.muted));
+                                    ui.label(
+                                        RichText::new("Filter").size(11.0).color(palette.muted),
+                                    );
                                     egui::ComboBox::from_id_salt("filter-type")
                                         .selected_text(band.filter.label())
                                         .width(150.0)
@@ -1420,7 +1423,9 @@ impl PeaceApp {
                                         });
                                     ui.end_row();
 
-                                    ui.label(RichText::new("Enabled").size(11.0).color(palette.muted));
+                                    ui.label(
+                                        RichText::new("Enabled").size(11.0).color(palette.muted),
+                                    );
                                     if widgets::switch(ui, &mut band.enabled, &palette).clicked() {
                                         changed = true;
                                     }
@@ -1516,7 +1521,12 @@ impl PeaceApp {
                 );
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
-                    widgets::chip(ui, &self.preset.speakers[speaker_index].targets, &palette, true);
+                    widgets::chip(
+                        ui,
+                        &self.preset.speakers[speaker_index].targets,
+                        &palette,
+                        true,
+                    );
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if ui
                             .small_button("copy from All")
@@ -1537,13 +1547,19 @@ impl PeaceApp {
         ui.add_space(4.0);
         let mut grid: Option<Grid> = None;
         ui.horizontal_wrapped(|ui| {
-            if widgets::ghost_button(ui, "13", &palette).on_hover_text("Octave grid").clicked() {
+            if widgets::ghost_button(ui, "13", &palette)
+                .on_hover_text("Octave grid")
+                .clicked()
+            {
                 grid = Some(Grid::Log(13));
             }
             if widgets::ghost_button(ui, "15", &palette).clicked() {
                 grid = Some(Grid::Log(15));
             }
-            if widgets::ghost_button(ui, "31", &palette).on_hover_text("Third octave").clicked() {
+            if widgets::ghost_button(ui, "31", &palette)
+                .on_hover_text("Third octave")
+                .clicked()
+            {
                 grid = Some(Grid::Log(31));
             }
             if widgets::ghost_button(ui, "1/3 oct", &palette).clicked() {
@@ -1608,9 +1624,12 @@ impl PeaceApp {
         ui.horizontal(|ui| {
             brand::status_dot(ui, self.status.kind.color(&palette), 10.0);
             ui.label(
-                RichText::new(&self.status.text)
-                    .size(11.0)
-                    .color(self.status.kind.color(&palette).gamma_multiply(self.status.opacity().max(0.55))),
+                RichText::new(&self.status.text).size(11.0).color(
+                    self.status
+                        .kind
+                        .color(&palette)
+                        .gamma_multiply(self.status.opacity().max(0.55)),
+                ),
             );
 
             if self.dirty {
@@ -1630,9 +1649,7 @@ impl PeaceApp {
                 if ui
                     .add(
                         egui::Label::new(
-                            RichText::new("data folder")
-                                .size(10.0)
-                                .color(palette.muted),
+                            RichText::new("data folder").size(10.0).color(palette.muted),
                         )
                         .sense(Sense::click()),
                     )
@@ -1685,7 +1702,10 @@ impl PeaceApp {
             .show(ctx, |ui| {
                 egui::Frame::none()
                     .fill(palette.card.gamma_multiply(opacity))
-                    .stroke(Stroke::new(1.0_f32, self.status.kind.color(&palette).gamma_multiply(opacity)))
+                    .stroke(Stroke::new(
+                        1.0_f32,
+                        self.status.kind.color(&palette).gamma_multiply(opacity),
+                    ))
                     .rounding(Rounding::same(9.0))
                     .inner_margin(egui::Margin::symmetric(14.0, 8.0))
                     .show(ui, |ui| {
@@ -1720,5 +1740,4 @@ mod tests {
         status.at = Instant::now() - std::time::Duration::from_secs(10);
         assert!(status.opacity() < 0.01);
     }
-
 }

@@ -21,9 +21,11 @@ pub struct MeasurementPoint {
 
 /// Splits a CSV/text line into numeric tokens.
 fn split_numbers(line: &str) -> Vec<f32> {
-    line.split(|c: char| c == ',' || c == ';' || c == '\t' || c == ' ')
+    line.split([',', ';', '\t', ' '])
         .filter_map(|token| {
-            let token = token.trim().trim_end_matches(|c: char| c.is_ascii_alphabetic());
+            let token = token
+                .trim()
+                .trim_end_matches(|c: char| c.is_ascii_alphabetic());
             if token.is_empty() {
                 return None;
             }
@@ -75,8 +77,7 @@ pub fn looks_like_rew(text: &str) -> bool {
     text.lines().any(|line| {
         let line = line.trim_start();
         let line = line.trim_start_matches('*').trim_start();
-        line.to_ascii_lowercase().starts_with("filter")
-            && line.to_ascii_lowercase().contains("fc")
+        line.to_ascii_lowercase().starts_with("filter") && line.to_ascii_lowercase().contains("fc")
     })
 }
 
@@ -118,7 +119,10 @@ pub fn import_text(text: &str, max_bands: usize) -> Result<MeasurementImport> {
         return Err(Error::msg("the file is empty"));
     }
 
-    if text.lines().any(|line| line.trim_start().starts_with("GraphicEQ")) {
+    if text
+        .lines()
+        .any(|line| line.trim_start().starts_with("GraphicEQ"))
+    {
         let mut points = Vec::new();
         for line in text.lines() {
             if line.trim_start().starts_with("GraphicEQ") {

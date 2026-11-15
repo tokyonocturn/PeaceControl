@@ -91,14 +91,7 @@ pub fn band_biquad(band: &Band, sample_rate: f32) -> Biquad {
             -2.0 * cos_w0,
             1.0 - alpha,
         ),
-        FilterType::BandPass => (
-            alpha,
-            0.0,
-            -alpha,
-            1.0 + alpha,
-            -2.0 * cos_w0,
-            1.0 - alpha,
-        ),
+        FilterType::BandPass => (alpha, 0.0, -alpha, 1.0 + alpha, -2.0 * cos_w0, 1.0 - alpha),
         FilterType::Notch => (
             1.0,
             -2.0 * cos_w0,
@@ -171,7 +164,12 @@ pub fn response_db(bands: &[Band], freq_hz: f32) -> f64 {
 }
 
 /// A response curve sampled on `points` logarithmically spaced frequencies.
-pub fn response_curve(bands: &[Band], first_hz: f32, last_hz: f32, points: usize) -> Vec<(f32, f64)> {
+pub fn response_curve(
+    bands: &[Band],
+    first_hz: f32,
+    last_hz: f32,
+    points: usize,
+) -> Vec<(f32, f64)> {
     let points = points.max(2);
     let lo = first_hz.max(1.0).log10() as f64;
     let hi = last_hz.max(first_hz + 1.0).log10() as f64;
@@ -245,7 +243,7 @@ mod tests {
         let band = Band {
             freq_hz: 1000.0,
             gain_db: 0.0,
-            q: 0.7071,
+            q: std::f32::consts::FRAC_1_SQRT_2,
             filter: FilterType::LowPass,
             enabled: true,
         };

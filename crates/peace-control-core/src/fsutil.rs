@@ -48,8 +48,7 @@ pub fn write_atomic(path: &Path, contents: &str) -> Result<()> {
         let mut file = fs::File::create(&temp).map_err(|e| Error::io_write(&temp, e))?;
         file.write_all(contents.as_bytes())
             .map_err(|e| Error::io_write(&temp, e))?;
-        file.write_all(b"")
-            .map_err(|e| Error::io_write(&temp, e))?;
+        file.write_all(b"").map_err(|e| Error::io_write(&temp, e))?;
         file.sync_all().map_err(|e| Error::io_write(&temp, e))?;
     }
 
@@ -129,7 +128,8 @@ mod tests {
     use super::*;
 
     fn scratch(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("peacecontrol-test-{}-{}", std::process::id(), name));
+        let dir =
+            std::env::temp_dir().join(format!("peacecontrol-test-{}-{}", std::process::id(), name));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir

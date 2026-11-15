@@ -19,6 +19,7 @@
 //! * [`dsp`] – predicted frequency response
 
 #![forbid(unsafe_code)]
+#![cfg_attr(test, allow(clippy::field_reassign_with_default))]
 
 pub mod audacity;
 pub mod autoeq;

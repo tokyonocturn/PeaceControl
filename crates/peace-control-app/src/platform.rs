@@ -91,7 +91,6 @@ pub fn start_with_windows_enabled() -> bool {
     false
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

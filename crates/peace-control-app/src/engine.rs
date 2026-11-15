@@ -66,13 +66,11 @@ impl Engine {
         }
 
         let preferred = settings.target_config.as_ref().map(PathBuf::from);
-        self.target = preferred
-            .filter(|path| path.exists())
-            .or_else(|| {
-                self.config_dir
-                    .as_ref()
-                    .and_then(|dir| paths::default_target(dir))
-            });
+        self.target = preferred.filter(|path| path.exists()).or_else(|| {
+            self.config_dir
+                .as_ref()
+                .and_then(|dir| paths::default_target(dir))
+        });
     }
 
     pub fn connected(&self) -> bool {
@@ -130,7 +128,10 @@ impl Engine {
             return Err(Error::NoTargetSelected);
         };
         let restored = backup::restore(snapshot, config_dir)?;
-        log::warn!("restored {restored} configuration files from {}", snapshot.display());
+        log::warn!(
+            "restored {restored} configuration files from {}",
+            snapshot.display()
+        );
         Ok(restored)
     }
 

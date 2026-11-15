@@ -5,7 +5,7 @@
 //! size stays crisp.
 
 use crate::theme::Palette;
-use egui::{Color32, Rounding, Pos2, Rect, Response, Sense, Stroke, Ui, Vec2};
+use egui::{Color32, Pos2, Rect, Response, Rounding, Sense, Stroke, Ui, Vec2};
 
 /// Draws the logo mark at `size` points.
 pub fn logo(ui: &mut Ui, size: f32, palette: &Palette) -> Response {
@@ -37,11 +37,7 @@ pub fn paint_logo(painter: &egui::Painter, rect: Rect, palette: &Palette) {
             Pos2::new(x, inner.bottom() - height),
             Vec2::new(bar_width, height),
         );
-        painter.rect_filled(
-            bar,
-            Rounding::same(bar_width * 0.42),
-            palette.accent,
-        );
+        painter.rect_filled(bar, Rounding::same(bar_width * 0.42), palette.accent);
     }
 }
 

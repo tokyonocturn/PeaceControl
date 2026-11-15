@@ -20,7 +20,11 @@ pub struct Snapshot {
 
 impl Snapshot {
     pub fn label(&self) -> String {
-        format!("{} ({} files)", self.path.file_name().unwrap_or_default().to_string_lossy(), self.files)
+        format!(
+            "{} ({} files)",
+            self.path.file_name().unwrap_or_default().to_string_lossy(),
+            self.files
+        )
     }
 }
 
@@ -145,7 +149,11 @@ mod tests {
         let config = scratch("config");
         std::fs::write(config.join("config.txt"), "Preamp: 0 dB").unwrap();
         std::fs::create_dir_all(config.join("nested")).unwrap();
-        std::fs::write(config.join("nested").join("device.txt"), "Filter: ON PK Fc 100 Hz Gain 1 dB Q 1").unwrap();
+        std::fs::write(
+            config.join("nested").join("device.txt"),
+            "Filter: ON PK Fc 100 Hz Gain 1 dB Q 1",
+        )
+        .unwrap();
         let root = scratch("backups");
         let snapshot = snapshot(&config, &root).unwrap();
         assert_eq!(snapshot.files, 2);
@@ -163,7 +171,10 @@ mod tests {
         let snapshot = snapshot(&config, &root).unwrap();
         std::fs::write(config.join("config.txt"), "changed").unwrap();
         restore(&snapshot.path, &config).unwrap();
-        assert_eq!(std::fs::read_to_string(config.join("config.txt")).unwrap(), "first");
+        assert_eq!(
+            std::fs::read_to_string(config.join("config.txt")).unwrap(),
+            "first"
+        );
         let _ = std::fs::remove_dir_all(config);
         let _ = std::fs::remove_dir_all(root);
     }

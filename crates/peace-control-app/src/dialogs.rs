@@ -1,9 +1,9 @@
 //! Secondary windows: effects, settings, commands, import, backups, help.
 
 use crate::app::{PeaceApp, StatusKind};
+use crate::platform;
 use crate::theme;
 use crate::widgets;
-use crate::platform;
 use eframe::egui::{self, RichText, Stroke};
 use peace_control_core::model::{Effects, MAX_BANDS};
 use peace_control_core::settings::Theme;
@@ -28,12 +28,7 @@ fn window_frame(palette: &theme::Palette) -> egui::Frame {
 }
 
 fn header(ui: &mut egui::Ui, title: &str, subtitle: &str, palette: &theme::Palette) {
-    ui.label(
-        RichText::new(title)
-            .size(17.0)
-            .strong()
-            .color(palette.text),
-    );
+    ui.label(RichText::new(title).size(17.0).strong().color(palette.text));
     if !subtitle.is_empty() {
         ui.label(RichText::new(subtitle).size(10.5).color(palette.muted));
     }
@@ -177,7 +172,8 @@ fn effects(app: &mut PeaceApp, ctx: &egui::Context) {
                     app.status("Effects reset", StatusKind::Info);
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if widgets::primary_button(ui, "Apply now", app.engine.ready(), &palette).clicked()
+                    if widgets::primary_button(ui, "Apply now", app.engine.ready(), &palette)
+                        .clicked()
                     {
                         app.apply_now();
                     }
@@ -199,8 +195,22 @@ fn effects_block(ui: &mut egui::Ui, effects: &mut Effects, palette: &theme::Pale
         palette,
     );
     if effects.bass.enabled {
-        changed |= param_row(ui, "Bass gain", &mut effects.bass.gain_db, -15.0..=15.0, " dB", palette);
-        changed |= param_row(ui, "Bass frequency", &mut effects.bass.freq_hz, 40.0..=500.0, " Hz", palette);
+        changed |= param_row(
+            ui,
+            "Bass gain",
+            &mut effects.bass.gain_db,
+            -15.0..=15.0,
+            " dB",
+            palette,
+        );
+        changed |= param_row(
+            ui,
+            "Bass frequency",
+            &mut effects.bass.freq_hz,
+            40.0..=500.0,
+            " Hz",
+            palette,
+        );
     }
     changed |= widgets::toggle_row(
         ui,
@@ -210,8 +220,22 @@ fn effects_block(ui: &mut egui::Ui, effects: &mut Effects, palette: &theme::Pale
         palette,
     );
     if effects.treble.enabled {
-        changed |= param_row(ui, "Treble gain", &mut effects.treble.gain_db, -15.0..=15.0, " dB", palette);
-        changed |= param_row(ui, "Treble frequency", &mut effects.treble.freq_hz, 2000.0..=16000.0, " Hz", palette);
+        changed |= param_row(
+            ui,
+            "Treble gain",
+            &mut effects.treble.gain_db,
+            -15.0..=15.0,
+            " dB",
+            palette,
+        );
+        changed |= param_row(
+            ui,
+            "Treble frequency",
+            &mut effects.treble.freq_hz,
+            2000.0..=16000.0,
+            " Hz",
+            palette,
+        );
     }
 
     ui.add_space(6.0);
@@ -224,7 +248,14 @@ fn effects_block(ui: &mut egui::Ui, effects: &mut Effects, palette: &theme::Pale
         palette,
     );
     if effects.crossfeed {
-        changed |= param_row(ui, "Feed level", &mut effects.crossfeed_db, -24.0..=-1.0, " dB", palette);
+        changed |= param_row(
+            ui,
+            "Feed level",
+            &mut effects.crossfeed_db,
+            -24.0..=-1.0,
+            " dB",
+            palette,
+        );
     }
     changed |= widgets::toggle_row(
         ui,
@@ -234,8 +265,22 @@ fn effects_block(ui: &mut egui::Ui, effects: &mut Effects, palette: &theme::Pale
         palette,
     );
     if effects.fake_stereo {
-        changed |= param_row(ui, "Delay", &mut effects.fake_stereo_delay_ms, 1.0..=60.0, " ms", palette);
-        changed |= param_row(ui, "Split frequency", &mut effects.fake_stereo_freq_hz, 200.0..=4000.0, " Hz", palette);
+        changed |= param_row(
+            ui,
+            "Delay",
+            &mut effects.fake_stereo_delay_ms,
+            1.0..=60.0,
+            " ms",
+            palette,
+        );
+        changed |= param_row(
+            ui,
+            "Split frequency",
+            &mut effects.fake_stereo_freq_hz,
+            200.0..=4000.0,
+            " Hz",
+            palette,
+        );
     }
     changed |= widgets::toggle_row(
         ui,
@@ -247,7 +292,14 @@ fn effects_block(ui: &mut egui::Ui, effects: &mut Effects, palette: &theme::Pale
 
     ui.add_space(6.0);
     widgets::section_title(ui, "Time and space", palette);
-    changed |= param_row(ui, "Delay", &mut effects.delay_ms, 0.0..=200.0, " ms", palette);
+    changed |= param_row(
+        ui,
+        "Delay",
+        &mut effects.delay_ms,
+        0.0..=200.0,
+        " ms",
+        palette,
+    );
     changed |= widgets::toggle_row(
         ui,
         "Echo",
@@ -256,7 +308,14 @@ fn effects_block(ui: &mut egui::Ui, effects: &mut Effects, palette: &theme::Pale
         palette,
     );
     if effects.echo {
-        changed |= param_row(ui, "Echoes", &mut effects.echo_delay_ms, 40.0..=1200.0, " ms", palette);
+        changed |= param_row(
+            ui,
+            "Echoes",
+            &mut effects.echo_delay_ms,
+            40.0..=1200.0,
+            " ms",
+            palette,
+        );
     }
 
     ui.add_space(6.0);
@@ -322,197 +381,216 @@ fn settings(app: &mut PeaceApp, ctx: &egui::Context) {
         .resizable(true)
         .frame(window_frame(&palette))
         .show(ctx, |ui| {
-            header(ui, "Settings", "Preferences are stored in the PeaceControl data folder.", &palette);
+            header(
+                ui,
+                "Settings",
+                "Preferences are stored in the PeaceControl data folder.",
+                &palette,
+            );
 
-            egui::ScrollArea::vertical().max_height(430.0).show(ui, |ui| {
-                widgets::section_title(ui, "Equalizer APO", &palette);
-                ui.add_space(4.0);
-                ui.horizontal(|ui| {
-                    let label = app
-                        .engine
-                        .apo_dir
-                        .as_ref()
-                        .map(|path| path.display().to_string())
-                        .unwrap_or_else(|| "Not detected".to_string());
-                    ui.label(
-                        RichText::new(label)
-                            .size(10.5)
-                            .monospace()
-                            .color(if app.engine.connected() {
+            egui::ScrollArea::vertical()
+                .max_height(430.0)
+                .show(ui, |ui| {
+                    widgets::section_title(ui, "Equalizer APO", &palette);
+                    ui.add_space(4.0);
+                    ui.horizontal(|ui| {
+                        let label = app
+                            .engine
+                            .apo_dir
+                            .as_ref()
+                            .map(|path| path.display().to_string())
+                            .unwrap_or_else(|| "Not detected".to_string());
+                        ui.label(RichText::new(label).size(10.5).monospace().color(
+                            if app.engine.connected() {
                                 palette.text
                             } else {
                                 palette.warn
-                            }),
-                    );
-                });
-                ui.horizontal(|ui| {
-                    if widgets::ghost_button(ui, "Choose folder…", &palette).clicked() {
-                        if let Some(path) = rfd::FileDialog::new()
-                            .set_title("Select the Equalizer APO installation folder")
-                            .pick_folder()
-                        {
-                            app.settings.equalizer_apo_dir =
-                                Some(path.display().to_string());
+                            },
+                        ));
+                    });
+                    ui.horizontal(|ui| {
+                        if widgets::ghost_button(ui, "Choose folder…", &palette).clicked() {
+                            if let Some(path) = rfd::FileDialog::new()
+                                .set_title("Select the Equalizer APO installation folder")
+                                .pick_folder()
+                            {
+                                app.settings.equalizer_apo_dir = Some(path.display().to_string());
+                                app.engine.refresh(&app.settings);
+                                settings_changed = true;
+                            }
+                        }
+                        if widgets::ghost_button(ui, "Detect again", &palette).clicked() {
+                            app.settings.equalizer_apo_dir = None;
                             app.engine.refresh(&app.settings);
                             settings_changed = true;
                         }
-                    }
-                    if widgets::ghost_button(ui, "Detect again", &palette).clicked() {
-                        app.settings.equalizer_apo_dir = None;
-                        app.engine.refresh(&app.settings);
-                        settings_changed = true;
-                    }
-                    if widgets::ghost_button(ui, "Open config folder", &palette).clicked() {
-                        if let Some(dir) = &app.engine.config_dir {
-                            platform::reveal(dir);
-                        }
-                    }
-                });
-
-                ui.add_space(6.0);
-                ui.label(RichText::new("Target configuration file").size(10.5).color(palette.muted));
-                let current = app
-                    .engine
-                    .target
-                    .as_ref()
-                    .and_then(|path| path.file_name())
-                    .map(|name| name.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "none".to_string());
-                egui::ComboBox::from_id_salt("target-config")
-                    .selected_text(current)
-                    .width(240.0)
-                    .show_ui(ui, |ui| {
-                        for target in &app.engine.targets {
-                            let selected = app.engine.target.as_ref() == Some(&target.path);
-                            if ui.selectable_label(selected, &target.label).clicked() {
-                                app.settings.target_config =
-                                    Some(target.path.display().to_string());
-                                app.engine.target = Some(target.path.clone());
-                                settings_changed = true;
+                        if widgets::ghost_button(ui, "Open config folder", &palette).clicked() {
+                            if let Some(dir) = &app.engine.config_dir {
+                                platform::reveal(dir);
                             }
                         }
                     });
 
-                ui.add_space(10.0);
-                ui.separator();
-                widgets::section_title(ui, "Appearance", &palette);
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Theme").size(11.5).color(palette.muted));
-                    for theme in Theme::ALL {
-                        if ui
-                            .selectable_label(app.settings.theme == theme, theme.label())
-                            .clicked()
-                        {
-                            app.settings.theme = theme;
-                            theme_changed = true;
-                        }
-                    }
-                });
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Accent").size(11.5).color(palette.muted));
-                    if ui
-                        .color_edit_button_srgb(&mut app.settings.accent)
-                        .changed()
-                    {
-                        theme_changed = true;
-                    }
+                    ui.add_space(6.0);
                     ui.label(
-                        RichText::new("Used across the interface and the graphs.")
-                            .size(9.5)
+                        RichText::new("Target configuration file")
+                            .size(10.5)
                             .color(palette.muted),
                     );
-                });
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Graph range").size(11.5).color(palette.muted));
-                    ui.add(
-                        egui::Slider::new(&mut app.settings.graph_range_db, 6.0..=48.0)
-                            .suffix(" dB"),
+                    let current = app
+                        .engine
+                        .target
+                        .as_ref()
+                        .and_then(|path| path.file_name())
+                        .map(|name| name.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "none".to_string());
+                    egui::ComboBox::from_id_salt("target-config")
+                        .selected_text(current)
+                        .width(240.0)
+                        .show_ui(ui, |ui| {
+                            for target in &app.engine.targets {
+                                let selected = app.engine.target.as_ref() == Some(&target.path);
+                                if ui.selectable_label(selected, &target.label).clicked() {
+                                    app.settings.target_config =
+                                        Some(target.path.display().to_string());
+                                    app.engine.target = Some(target.path.clone());
+                                    settings_changed = true;
+                                }
+                            }
+                        });
+
+                    ui.add_space(10.0);
+                    ui.separator();
+                    widgets::section_title(ui, "Appearance", &palette);
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Theme").size(11.5).color(palette.muted));
+                        for theme in Theme::ALL {
+                            if ui
+                                .selectable_label(app.settings.theme == theme, theme.label())
+                                .clicked()
+                            {
+                                app.settings.theme = theme;
+                                theme_changed = true;
+                            }
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Accent").size(11.5).color(palette.muted));
+                        if ui
+                            .color_edit_button_srgb(&mut app.settings.accent)
+                            .changed()
+                        {
+                            theme_changed = true;
+                        }
+                        ui.label(
+                            RichText::new("Used across the interface and the graphs.")
+                                .size(9.5)
+                                .color(palette.muted),
+                        );
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Graph range").size(11.5).color(palette.muted));
+                        ui.add(
+                            egui::Slider::new(&mut app.settings.graph_range_db, 6.0..=48.0)
+                                .suffix(" dB"),
+                        );
+                    });
+
+                    ui.add_space(10.0);
+                    ui.separator();
+                    widgets::section_title(ui, "Behaviour", &palette);
+                    settings_changed |= widgets::toggle_row(
+                        ui,
+                        "Apply automatically",
+                        "Rewrite the Equalizer APO file shortly after a change.",
+                        &mut app.settings.apply_automatically,
+                        &palette,
                     );
-                });
-
-                ui.add_space(10.0);
-                ui.separator();
-                widgets::section_title(ui, "Behaviour", &palette);
-                settings_changed |= widgets::toggle_row(
-                    ui,
-                    "Apply automatically",
-                    "Rewrite the Equalizer APO file shortly after a change.",
-                    &mut app.settings.apply_automatically,
-                    &palette,
-                );
-                settings_changed |= widgets::toggle_row(
-                    ui,
-                    "Save recovery drafts",
-                    "Keep an unsaved copy so a crash never loses your tuning.",
-                    &mut app.settings.draft_autosave,
-                    &palette,
-                );
-                settings_changed |= widgets::toggle_row(
-                    ui,
-                    "Back up on exit",
-                    "Snapshot the Equalizer APO configuration folder when closing.",
-                    &mut app.settings.backup_on_exit,
-                    &palette,
-                );
-                settings_changed |= widgets::toggle_row(
-                    ui,
-                    "Start with Windows",
-                    "Adds a per user autostart entry.",
-                    &mut app.settings.start_with_windows,
-                    &palette,
-                );
-                if let Err(error) = platform::set_start_with_windows(app.settings.start_with_windows) {
-                    ui.label(RichText::new(error).size(9.5).color(palette.warn));
-                }
-                settings_changed |= widgets::toggle_row(
-                    ui,
-                    "Include preamp in the graph",
-                    "Show the effect of the preamp on the predicted curve.",
-                    &mut app.settings.preamp_in_graph,
-                    &palette,
-                );
-
-                ui.add_space(10.0);
-                ui.separator();
-                widgets::section_title(ui, "Defaults", &palette);
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Bands for new configurations").size(11.5).color(palette.muted));
-                    if ui
-                        .add(
-                            egui::DragValue::new(&mut app.settings.default_band_count)
-                                .range(1..=MAX_BANDS),
-                        )
-                        .changed()
+                    settings_changed |= widgets::toggle_row(
+                        ui,
+                        "Save recovery drafts",
+                        "Keep an unsaved copy so a crash never loses your tuning.",
+                        &mut app.settings.draft_autosave,
+                        &palette,
+                    );
+                    settings_changed |= widgets::toggle_row(
+                        ui,
+                        "Back up on exit",
+                        "Snapshot the Equalizer APO configuration folder when closing.",
+                        &mut app.settings.backup_on_exit,
+                        &palette,
+                    );
+                    settings_changed |= widgets::toggle_row(
+                        ui,
+                        "Start with Windows",
+                        "Adds a per user autostart entry.",
+                        &mut app.settings.start_with_windows,
+                        &palette,
+                    );
+                    if let Err(error) =
+                        platform::set_start_with_windows(app.settings.start_with_windows)
                     {
-                        settings_changed = true;
+                        ui.label(RichText::new(error).size(9.5).color(palette.warn));
                     }
-                });
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Snapshots to keep").size(11.5).color(palette.muted));
-                    if ui
-                        .add(egui::DragValue::new(&mut app.settings.max_backups).range(1..=100))
-                        .changed()
-                    {
-                        settings_changed = true;
-                    }
-                });
+                    settings_changed |= widgets::toggle_row(
+                        ui,
+                        "Include preamp in the graph",
+                        "Show the effect of the preamp on the predicted curve.",
+                        &mut app.settings.preamp_in_graph,
+                        &palette,
+                    );
 
-                ui.add_space(10.0);
-                ui.separator();
-                ui.horizontal(|ui| {
-                    if widgets::ghost_button(ui, "Open data folder", &palette).clicked() {
-                        platform::reveal(app.paths.root());
-                    }
-                    if widgets::ghost_button(ui, "Open log file", &palette).clicked() {
-                        platform::open(&peace_control_core::logging::log_file(&app.paths.logs_dir()));
-                    }
-                    if widgets::ghost_button(ui, "Reset settings", &palette).clicked() {
-                        app.reset_settings();
-                        theme_changed = true;
-                        settings_changed = true;
-                    }
+                    ui.add_space(10.0);
+                    ui.separator();
+                    widgets::section_title(ui, "Defaults", &palette);
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new("Bands for new configurations")
+                                .size(11.5)
+                                .color(palette.muted),
+                        );
+                        if ui
+                            .add(
+                                egui::DragValue::new(&mut app.settings.default_band_count)
+                                    .range(1..=MAX_BANDS),
+                            )
+                            .changed()
+                        {
+                            settings_changed = true;
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new("Snapshots to keep")
+                                .size(11.5)
+                                .color(palette.muted),
+                        );
+                        if ui
+                            .add(egui::DragValue::new(&mut app.settings.max_backups).range(1..=100))
+                            .changed()
+                        {
+                            settings_changed = true;
+                        }
+                    });
+
+                    ui.add_space(10.0);
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if widgets::ghost_button(ui, "Open data folder", &palette).clicked() {
+                            platform::reveal(app.paths.root());
+                        }
+                        if widgets::ghost_button(ui, "Open log file", &palette).clicked() {
+                            platform::open(&peace_control_core::logging::log_file(
+                                &app.paths.logs_dir(),
+                            ));
+                        }
+                        if widgets::ghost_button(ui, "Reset settings", &palette).clicked() {
+                            app.reset_settings();
+                            theme_changed = true;
+                            settings_changed = true;
+                        }
+                    });
                 });
-            });
 
             let _ = settings_changed;
         });
@@ -580,15 +658,23 @@ fn commands(app: &mut PeaceApp, ctx: &egui::Context) {
                     app.export_text = app.engine.preview(&app.preset);
                     app.export_title = "Rendered configuration".to_string();
                     ui.ctx().copy_text(app.export_text.clone());
-                    app.status("Rendered configuration copied to the clipboard", StatusKind::Success);
+                    app.status(
+                        "Rendered configuration copied to the clipboard",
+                        StatusKind::Success,
+                    );
                 }
                 ui.label(
-                    RichText::new(format!("{} command line(s)", app.preset.commands_effective().len()))
-                        .size(10.0)
-                        .color(palette.muted),
+                    RichText::new(format!(
+                        "{} command line(s)",
+                        app.preset.commands_effective().len()
+                    ))
+                    .size(10.0)
+                    .color(palette.muted),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if widgets::primary_button(ui, "Apply now", app.engine.ready(), &palette).clicked() {
+                    if widgets::primary_button(ui, "Apply now", app.engine.ready(), &palette)
+                        .clicked()
+                    {
                         app.apply_now();
                     }
                 });
@@ -659,11 +745,7 @@ fn import(app: &mut PeaceApp, ctx: &egui::Context) {
 
             if let Some(summary) = &app.import_summary {
                 ui.add_space(6.0);
-                ui.label(
-                    RichText::new(summary)
-                        .size(11.5)
-                        .color(palette.ok),
-                );
+                ui.label(RichText::new(summary).size(11.5).color(palette.ok));
             }
             for note in &app.import_notes {
                 ui.label(RichText::new(note).size(10.0).color(palette.muted));
@@ -673,7 +755,10 @@ fn import(app: &mut PeaceApp, ctx: &egui::Context) {
                     RichText::new(format!(
                         "{} band(s) ready; {} filters in the curve.",
                         bands.len(),
-                        bands.iter().filter(|band| band.gain_db.abs() > 0.05).count()
+                        bands
+                            .iter()
+                            .filter(|band| band.gain_db.abs() > 0.05)
+                            .count()
                     ))
                     .size(10.0)
                     .color(palette.muted),
@@ -682,8 +767,13 @@ fn import(app: &mut PeaceApp, ctx: &egui::Context) {
 
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                if widgets::primary_button(ui, "Replace configuration", !app.import_text.is_empty(), &palette)
-                    .clicked()
+                if widgets::primary_button(
+                    ui,
+                    "Replace configuration",
+                    !app.import_text.is_empty(),
+                    &palette,
+                )
+                .clicked()
                 {
                     app.apply_import(true);
                 }
@@ -920,7 +1010,12 @@ fn recovery(app: &mut PeaceApp, ctx: &egui::Context) {
                 .color(palette.text),
             );
             if let Some(source) = &draft.source {
-                ui.label(RichText::new(source).size(9.5).monospace().color(palette.muted));
+                ui.label(
+                    RichText::new(source)
+                        .size(9.5)
+                        .monospace()
+                        .color(palette.muted),
+                );
             }
             ui.add_space(10.0);
             ui.horizontal(|ui| {
@@ -953,4 +1048,3 @@ fn recovery(app: &mut PeaceApp, ctx: &egui::Context) {
         });
     app.windows.recovery = open;
 }
-

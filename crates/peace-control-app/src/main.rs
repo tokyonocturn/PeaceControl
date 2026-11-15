@@ -2,6 +2,7 @@
 //! Equalizer APO, written entirely in Rust.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(test, allow(clippy::field_reassign_with_default))]
 
 mod app;
 mod brand;
@@ -33,7 +34,11 @@ fn main() -> eframe::Result<()> {
         "PeaceControl {} starting on {} ({})",
         peace_control_core::VERSION,
         std::env::consts::OS,
-        if paths.is_portable() { "portable" } else { "installed" }
+        if paths.is_portable() {
+            "portable"
+        } else {
+            "installed"
+        }
     );
 
     let (rgba, width, height) = brand::icon_rgba(64);

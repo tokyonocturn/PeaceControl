@@ -230,17 +230,8 @@ pub fn parse_config(text: &str) -> Option<ImportReport> {
                 .unwrap_or(0.0);
             report.preamps += 1;
             match current.as_mut() {
-                Some(speaker) if !preset.speakers.is_empty() || speaker.bands.len() > 0 => {
-                    speaker.preamp_db = value;
-                }
                 Some(speaker) => speaker.preamp_db = value,
-                None => {
-                    if preset.speakers.is_empty() && current.is_none() && report.preamps == 1 {
-                        preset.preamp_db = value;
-                    } else {
-                        preset.preamp_db = value;
-                    }
-                }
+                None => preset.preamp_db = value,
             }
             continue;
         }
@@ -266,10 +257,9 @@ pub fn parse_config(text: &str) -> Option<ImportReport> {
         }
 
         if lower.starts_with("include:") {
-            report.notes.push(format!(
-                "Include line kept as a raw command: {}",
-                line
-            ));
+            report
+                .notes
+                .push(format!("Include line kept as a raw command: {}", line));
             report.passthrough.push(line.to_string());
             continue;
         }
@@ -293,10 +283,14 @@ pub fn parse_config(text: &str) -> Option<ImportReport> {
     );
 
     if preset.speakers.is_empty() {
-        preset.speakers.push(SpeakerEq::new("All", "all").with_log_bands(13));
+        preset
+            .speakers
+            .push(SpeakerEq::new("All", "all").with_log_bands(13));
     }
     for speaker in &mut preset.speakers {
-        speaker.bands.sort_by(|a, b| a.freq_hz.total_cmp(&b.freq_hz));
+        speaker
+            .bands
+            .sort_by(|a, b| a.freq_hz.total_cmp(&b.freq_hz));
         speaker.bands.truncate(MAX_BANDS);
         speaker.preamp_db = speaker.preamp_db.clamp(-60.0, 30.0);
     }

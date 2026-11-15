@@ -135,10 +135,7 @@ impl FilterType {
 
     /// Whether the quality factor matters for this shape.
     pub fn uses_q(self) -> bool {
-        !matches!(
-            self,
-            FilterType::LowShelf6 | FilterType::HighShelf6
-        )
+        !matches!(self, FilterType::LowShelf6 | FilterType::HighShelf6)
     }
 
     /// The integer Peace writes into `Filter{n}` keys of a `.peace` file.
@@ -243,7 +240,9 @@ impl Band {
 
     /// True when this band leaves the signal unchanged.
     pub fn is_neutral(&self) -> bool {
-        !self.enabled || (!self.filter.uses_gain() && self.gain_db.abs() < 0.05) || self.gain_db.abs() < 0.05
+        !self.enabled
+            || (!self.filter.uses_gain() && self.gain_db.abs() < 0.05)
+            || self.gain_db.abs() < 0.05
     }
 }
 
@@ -326,9 +325,9 @@ pub fn log_bands(count: usize) -> Vec<Band> {
 /// Standard 1/3 octave centre frequencies (31 bands, 20 Hz to 20 kHz).
 pub fn third_octave_frequencies() -> Vec<f32> {
     vec![
-        20.0, 25.0, 31.5, 40.0, 50.0, 63.0, 80.0, 100.0, 125.0, 160.0, 200.0, 250.0, 315.0,
-        400.0, 500.0, 630.0, 800.0, 1000.0, 1250.0, 1600.0, 2000.0, 2500.0, 3150.0, 4000.0,
-        5000.0, 6300.0, 8000.0, 10000.0, 12500.0, 16000.0, 20000.0,
+        20.0, 25.0, 31.5, 40.0, 50.0, 63.0, 80.0, 100.0, 125.0, 160.0, 200.0, 250.0, 315.0, 400.0,
+        500.0, 630.0, 800.0, 1000.0, 1250.0, 1600.0, 2000.0, 2500.0, 3150.0, 4000.0, 5000.0,
+        6300.0, 8000.0, 10000.0, 12500.0, 16000.0, 20000.0,
     ]
 }
 
@@ -570,7 +569,11 @@ impl Preset {
 
     /// Highest band count across all speaker banks.
     pub fn band_count(&self) -> usize {
-        self.speakers.iter().map(|s| s.bands.len()).max().unwrap_or(0)
+        self.speakers
+            .iter()
+            .map(|s| s.bands.len())
+            .max()
+            .unwrap_or(0)
     }
 
     /// Applies `f` to every band of every speaker bank.
@@ -648,7 +651,7 @@ pub fn speaker_name_for(targets: &str, index: usize) -> String {
         "SL SR" => "Side".to_string(),
         "RL RR" => "Rear".to_string(),
         "L R" => "Stereo".to_string(),
-        other if other.is_empty() => format!("Speaker {}", index + 1),
+        "" => format!("Speaker {}", index + 1),
         other => other.to_string(),
     }
 }
@@ -670,7 +673,9 @@ mod tests {
         let bands = &preset.speakers[0].bands;
         assert_eq!(bands.len(), 31);
         assert!(bands.windows(2).all(|w| w[0].freq_hz <= w[1].freq_hz));
-        assert!(bands.iter().all(|b| b.freq_hz >= MIN_FREQ_HZ && b.freq_hz <= MAX_FREQ_HZ));
+        assert!(bands
+            .iter()
+            .all(|b| b.freq_hz >= MIN_FREQ_HZ && b.freq_hz <= MAX_FREQ_HZ));
     }
 
     #[test]
@@ -682,7 +687,14 @@ mod tests {
         assert!(speaker.bands.iter().any(|b| (b.gain_db - 6.0).abs() < 0.01));
         speaker.set_band_count(13);
         assert_eq!(speaker.bands.len(), 13);
-        assert_eq!(speaker.bands.iter().filter(|b| b.gain_db.abs() > 0.01).count(), 1);
+        assert_eq!(
+            speaker
+                .bands
+                .iter()
+                .filter(|b| b.gain_db.abs() > 0.01)
+                .count(),
+            1
+        );
     }
 
     #[test]

@@ -39,9 +39,7 @@ impl AppPaths {
                 .unwrap_or(false);
 
         if portable_flag {
-            let root = exe_dir
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join("data");
+            let root = exe_dir.unwrap_or_else(|| PathBuf::from(".")).join("data");
             return AppPaths {
                 root,
                 portable: true,
@@ -185,7 +183,7 @@ pub fn resolve_target(config_dir: &Path, preferred: Option<&Path>) -> Result<Pat
             }
         }
     }
-    default_target(config_dir).ok_or_else(|| Error::NoTargetSelected)
+    default_target(config_dir).ok_or(Error::NoTargetSelected)
 }
 
 /// Lists `Include:` targets of a configuration file.
@@ -233,12 +231,18 @@ mod tests {
 
     #[test]
     fn config_dir_is_named_config() {
-        assert_eq!(config_dir(Path::new(r"C:\EQ")), PathBuf::from(r"C:\EQ").join("config"));
+        assert_eq!(
+            config_dir(Path::new(r"C:\EQ")),
+            PathBuf::from(r"C:\EQ").join("config")
+        );
     }
 
     #[test]
     fn detect_returns_none_for_missing_configured_dir() {
-        assert!(detect_equalizer_apo(Some(Path::new(r"C:\definitely-not-here"))).is_none_or(|dir| is_equalizer_apo_dir(&dir)));
+        assert!(
+            detect_equalizer_apo(Some(Path::new(r"C:\definitely-not-here")))
+                .is_none_or(|dir| is_equalizer_apo_dir(&dir))
+        );
     }
 
     #[test]

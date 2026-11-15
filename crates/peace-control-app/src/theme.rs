@@ -4,9 +4,7 @@
 //! both light and dark mode. Colours, radii and spacing live here and nowhere
 //! else.
 
-use egui::{
-    Color32, Context, Rounding, FontFamily, FontId, Stroke, TextStyle, Visuals,
-};
+use egui::{Color32, Context, FontFamily, FontId, Rounding, Stroke, TextStyle, Visuals};
 
 /// Colour roles used by the interface.
 #[derive(Debug, Clone, Copy)]

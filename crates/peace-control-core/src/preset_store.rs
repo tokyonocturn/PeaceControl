@@ -40,7 +40,7 @@ impl PresetStore {
     pub fn list(&self) -> Vec<StoredPreset> {
         fsutil::list_with_extensions(&self.dir, &["json"])
             .into_iter()
-            .filter_map(|path| {
+            .map(|path| {
                 let name = path
                     .file_stem()
                     .map(|stem| stem.to_string_lossy().to_string())
@@ -50,11 +50,11 @@ impl PresetStore {
                     .and_then(|text| serde_json::from_str::<Preset>(&text).ok())
                     .map(|preset| preset.description)
                     .unwrap_or_default();
-                Some(StoredPreset {
+                StoredPreset {
                     name,
                     path,
                     description,
-                })
+                }
             })
             .collect()
     }

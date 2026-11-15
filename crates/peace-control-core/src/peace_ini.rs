@@ -212,16 +212,16 @@ fn read_general(ini: &Ini, preset: &mut Preset) {
     preset.effects.downmix_71 = ini.boolean("General", "Downmix 7.1");
     preset.effects.crossfeed = ini.boolean("General", "Crossfeed");
     preset.effects.fake_stereo = ini.boolean("General", "Fake Stereo");
-    preset.effects.echo = ini.boolean("General", "Echo Count") || ini.find("General", "Echo Count").is_some();
+    preset.effects.echo =
+        ini.boolean("General", "Echo Count") || ini.find("General", "Echo Count").is_some();
     preset.effects.delay_ms = ini.number("General", "Delay").unwrap_or(0.0);
     preset.effects.echo_count = ini
         .integer("General", "Echo Count")
         .unwrap_or(0)
         .clamp(0, 8) as u32;
     preset.effects.echo_delay_ms = ini.number("General", "Echo Delay").unwrap_or(250.0);
-    preset.effects.fake_stereo_delay_ms = ini
-        .number("General", "Fake Stereo Delay")
-        .unwrap_or(20.0);
+    preset.effects.fake_stereo_delay_ms =
+        ini.number("General", "Fake Stereo Delay").unwrap_or(20.0);
     preset.effects.fake_stereo_freq_hz = ini
         .number("General", "Fake Stereo Frequency")
         .unwrap_or(1000.0);
@@ -305,15 +305,15 @@ pub fn parse_preset(text: &str) -> Result<Preset> {
             let mut speaker = SpeakerEq::new(name, targets);
             speaker.bands = read_bands(&ini, id.max(0) as usize);
             if id > 0 {
-                speaker.preamp_db = ini
-                    .number("General", &format!("PreAmp{id}"))
-                    .unwrap_or(0.0);
+                speaker.preamp_db = ini.number("General", &format!("PreAmp{id}")).unwrap_or(0.0);
             }
             preset.speakers.push(speaker);
         }
     }
     if preset.speakers.is_empty() {
-        preset.speakers.push(SpeakerEq::new("All", "all").with_log_bands(13));
+        preset
+            .speakers
+            .push(SpeakerEq::new("All", "all").with_log_bands(13));
     }
 
     for (_, value) in ini.section("Commands") {
@@ -371,7 +371,11 @@ pub fn to_peace_string(preset: &Preset) -> String {
     }
     let effects = &preset.effects;
     if effects.bass.enabled {
-        push_key(&mut general, "Bass Gain", format_number(effects.bass.gain_db));
+        push_key(
+            &mut general,
+            "Bass Gain",
+            format_number(effects.bass.gain_db),
+        );
         push_key(
             &mut general,
             "Bass Frequency",
@@ -512,11 +516,7 @@ pub fn to_peace_string(preset: &Preset) -> String {
             push_section(&mut out, &format!("Disabled{suffix}"));
             for (band_index, band) in speaker.bands.iter().enumerate() {
                 if !band.enabled {
-                    push_key(
-                        &mut out,
-                        &format!("Disabled{}", band_index + 1),
-                        1,
-                    );
+                    push_key(&mut out, &format!("Disabled{}", band_index + 1), 1);
                 }
             }
         }
@@ -566,11 +566,7 @@ pub fn to_peace_string(preset: &Preset) -> String {
             "Subwoofer Delay",
             format_number(surround.subwoofer_delay_ms),
         );
-        push_key(
-            &mut out,
-            "Front Width",
-            format_number(surround.front_width),
-        );
+        push_key(&mut out, "Front Width", format_number(surround.front_width));
         push_key(&mut out, "Side Width", format_number(surround.side_width));
         push_key(&mut out, "Rear Width", format_number(surround.rear_width));
     }
@@ -610,7 +606,8 @@ pub fn save_preset_file(path: &Path, preset: &Preset) -> Result<()> {
 mod tests {
     use super::*;
 
-    const SAMPLE: &str = "[General]\r\nDescription=Bass boost using a low shelf filter\r\nPreAmp=-4\r\n\
+    const SAMPLE: &str =
+        "[General]\r\nDescription=Bass boost using a low shelf filter\r\nPreAmp=-4\r\n\
 [Speakers]\r\nSpeakerId0=0\r\nSpeakerTargets0=all\r\nSpeakerName0=All\r\n\
 SpeakerId1=1\r\nSpeakerTargets1=L\r\nSpeakerName1=Left\r\n\
 [Frequencies]\r\nFrequency1=10\r\nFrequency2=100\r\nFrequency3=1000\r\n\

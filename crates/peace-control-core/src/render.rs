@@ -124,10 +124,7 @@ fn render_effects(preset: &Preset, out: &mut Vec<String>) {
         // and this keeps the expression readable.
         let amount = 10f32.powf(effects.crossfeed_db / 20.0).clamp(0.0, 1.0);
         out.push("Copy: L2=L R2=R".to_string());
-        out.push(format!(
-            "Copy: L=L+{0}*R2 R=R+{0}*L2",
-            num(amount)
-        ));
+        out.push(format!("Copy: L=L+{0}*R2 R=R+{0}*L2", num(amount)));
         out.push("Copy: L2=0 R2=0".to_string());
     }
 
@@ -167,11 +164,7 @@ fn render_effects(preset: &Preset, out: &mut Vec<String>) {
                 "Delay: {} ms",
                 num(effects.echo_delay_ms * (index + 1) as f32)
             ));
-            mix.push_str(&format!(
-                "+{}*L{}",
-                0.4 / (index + 1) as f32,
-                index + 2
-            ));
+            mix.push_str(&format!("+{}*L{}", 0.4 / (index + 1) as f32, index + 2));
         }
         out.push(channel_line("all"));
         out.push(format!("{mix} R=0.7*R"));
@@ -187,22 +180,16 @@ fn render_effects(preset: &Preset, out: &mut Vec<String>) {
     }
 
     if effects.downmix_51 {
-        out.push(
-            "Copy: L=0.314*L+0.222*C+0.031*SUB+0.268*RL+0.164*RR".to_string(),
-        );
-        out.push(
-            "Copy: R=0.314*R+0.222*C+0.031*SUB+0.268*RR+0.164*RL".to_string(),
-        );
+        out.push("Copy: L=0.314*L+0.222*C+0.031*SUB+0.268*RL+0.164*RR".to_string());
+        out.push("Copy: R=0.314*R+0.222*C+0.031*SUB+0.268*RR+0.164*RL".to_string());
     }
 
     if effects.downmix_71 {
         out.push(
-            "Copy: L=0.222*L+0.157*C+0.022*SUB+0.189*RL+0.116*RR+0.203*SL+0.090*SR"
-                .to_string(),
+            "Copy: L=0.222*L+0.157*C+0.022*SUB+0.189*RL+0.116*RR+0.203*SL+0.090*SR".to_string(),
         );
         out.push(
-            "Copy: R=0.222*R+0.157*C+0.022*SUB+0.189*RR+0.116*RL+0.203*SR+0.090*SL"
-                .to_string(),
+            "Copy: R=0.222*R+0.157*C+0.022*SUB+0.189*RR+0.116*RL+0.203*SR+0.090*SL".to_string(),
         );
     }
 
@@ -232,11 +219,17 @@ fn render_surround(preset: &Preset, out: &mut Vec<String>) {
     ));
     if surround.side_level.abs() > 0.001 {
         out.push(channel_line("SL SR"));
-        out.push(format!("Preamp: {} dB", num(20.0 * surround.side_level.max(1e-3).log10())));
+        out.push(format!(
+            "Preamp: {} dB",
+            num(20.0 * surround.side_level.max(1e-3).log10())
+        ));
     }
     if surround.rear_level.abs() > 0.001 {
         out.push(channel_line("RL RR"));
-        out.push(format!("Preamp: {} dB", num(20.0 * surround.rear_level.max(1e-3).log10())));
+        out.push(format!(
+            "Preamp: {} dB",
+            num(20.0 * surround.rear_level.max(1e-3).log10())
+        ));
     }
     out.push(channel_line("all"));
 }
@@ -264,7 +257,9 @@ pub fn render_config(preset: &Preset, options: &RenderOptions) -> String {
         let active_bands: Vec<&Band> = speaker
             .bands
             .iter()
-            .filter(|band| band.enabled && (!band.filter.uses_gain() || band.gain_db.abs() > 0.0005))
+            .filter(|band| {
+                band.enabled && (!band.filter.uses_gain() || band.gain_db.abs() > 0.0005)
+            })
             .collect();
         if active_bands.is_empty() && !has_preamp {
             continue;
@@ -350,7 +345,9 @@ mod tests {
     #[test]
     fn speaker_targets_become_channel_lines() {
         let mut preset = preset_with_bands();
-        preset.speakers.push(SpeakerEq::new("Front", "L C R").with_log_bands(3));
+        preset
+            .speakers
+            .push(SpeakerEq::new("Front", "L C R").with_log_bands(3));
         preset.speakers[1].bands[0].gain_db = 4.0;
         let text = render_config(&preset, &RenderOptions::default());
         assert!(text.contains("Channel: L C R"));
