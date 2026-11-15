@@ -42,7 +42,8 @@ impl Biquad {
         20.0 * magnitude.log10()
     }
 
-    /// The transfer function at DC and Nyquist, used by tests.
+    /// The transfer function at DC, used by tests.
+    #[cfg(test)]
     fn dc_gain_db(&self) -> f64 {
         let num = self.b0 + self.b1 + self.b2;
         let den = 1.0 + self.a1 + self.a2;
@@ -115,14 +116,10 @@ pub fn band_biquad(band: &Band, sample_rate: f32) -> Biquad {
             1.0 - alpha,
         ),
         FilterType::LowShelf | FilterType::LowShelf6 | FilterType::LowShelf12 => {
-            let s = q.clamp(0.1, 4.0);
-            let beta = 2.0 * a.sqrt() * alpha;
-            let _ = s;
-            let _ = beta;
-            shelf_low(a, cos_w0, sin_w0, q, sample_rate as f64, freq)
+            shelf_low(a, cos_w0, sin_w0, q)
         }
         FilterType::HighShelf | FilterType::HighShelf6 | FilterType::HighShelf12 => {
-            shelf_high(a, cos_w0, sin_w0, q, sample_rate as f64, freq)
+            shelf_high(a, cos_w0, sin_w0, q)
         }
     };
 
@@ -135,9 +132,7 @@ pub fn band_biquad(band: &Band, sample_rate: f32) -> Biquad {
     }
 }
 
-fn shelf_low(a: f64, cos_w0: f64, sin_w0: f64, q: f64, fs: f64, freq: f64) -> (f64, f64, f64, f64, f64, f64) {
-    let _ = fs;
-    let _ = freq;
+fn shelf_low(a: f64, cos_w0: f64, sin_w0: f64, q: f64) -> (f64, f64, f64, f64, f64, f64) {
     let s = q.clamp(0.1, 4.0);
     let beta = 2.0 * a.sqrt() * (sin_w0 / (2.0 * (1.0 / s).sqrt().max(0.05)));
     let b0 = a * ((a + 1.0) - (a - 1.0) * cos_w0 + beta);
@@ -149,9 +144,7 @@ fn shelf_low(a: f64, cos_w0: f64, sin_w0: f64, q: f64, fs: f64, freq: f64) -> (f
     (b0, b1, b2, a0, a1, a2)
 }
 
-fn shelf_high(a: f64, cos_w0: f64, sin_w0: f64, q: f64, fs: f64, freq: f64) -> (f64, f64, f64, f64, f64, f64) {
-    let _ = fs;
-    let _ = freq;
+fn shelf_high(a: f64, cos_w0: f64, sin_w0: f64, q: f64) -> (f64, f64, f64, f64, f64, f64) {
     let s = q.clamp(0.1, 4.0);
     let beta = 2.0 * a.sqrt() * (sin_w0 / (2.0 * (1.0 / s).sqrt().max(0.05)));
     let b0 = a * ((a + 1.0) + (a - 1.0) * cos_w0 + beta);

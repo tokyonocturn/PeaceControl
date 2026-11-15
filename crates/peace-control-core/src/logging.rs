@@ -17,7 +17,6 @@ const KEEP_FILES: usize = 3;
 
 struct FileLogger {
     file: Mutex<std::fs::File>,
-    path: PathBuf,
     level: LevelFilter,
 }
 
@@ -92,7 +91,6 @@ pub fn init(log_dir: &Path, level: &str) -> Result<PathBuf> {
 
     let logger = FileLogger {
         file: Mutex::new(file),
-        path: path.clone(),
         level,
     };
 
