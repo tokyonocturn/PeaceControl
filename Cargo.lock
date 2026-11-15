@@ -1793,7 +1793,7 @@ dependencies = [
 
 [[package]]
 name = "peace-control-app"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "eframe",
  "egui",
@@ -1809,7 +1809,7 @@ dependencies = [
 
 [[package]]
 name = "peace-control-cli"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "log",
  "peace-control-core",
@@ -1818,7 +1818,7 @@ dependencies = [
 
 [[package]]
 name = "peace-control-core"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "log",
  "serde",

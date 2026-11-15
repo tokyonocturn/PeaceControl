@@ -149,13 +149,18 @@ Command templates observed verbatim in presets: `Preamp: -3 dB`,
 | Presets, import, export | Yes; `.peace` interop, JSON library, Audacity export |
 | Device/config target selection | Yes, detection plus explicit target |
 | Backups, settings, logging | Yes, plus crash recovery drafts |
-| Tray icon, global hotkeys, process automation | Not implemented |
-| Peak value meter (proprietary DLL) | Not implemented |
+| Tray icon | Yes: native menu with show/hide, enable, configurations, settings, exit |
+| Global hotkeys | Yes: toggle and previous/next configuration, user configurable |
+| Process automation | Yes: foreground process rules edited in the Applications window |
+| Device attachment automation | No: the configuration target is chosen manually |
+| Peak value meter | No: no audio is processed here, so there is nothing to meter |
 | VST config editor bridge, update check, translations | Not implemented |
 
-These omissions are deliberate: they depend on the original vendor's component
-or on Windows shell integration that would add substantial risk without adding
-equalizer capability. See `docs/COMPATIBILITY.md`.
+The remaining omissions are deliberate. Device attachment would require
+inspecting every audio endpoint; the peak meter needs the original vendor's
+metering component or a sample-accurate tap; the VST bridge opens another
+application's editor; update checks and translations require a network service
+and a translation effort. See `docs/COMPATIBILITY.md`.
 
 ## 7. Branding and assets
 

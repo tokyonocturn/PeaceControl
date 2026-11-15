@@ -34,12 +34,15 @@ contains no code or assets from them.
 | Files | Detects the Equalizer APO installation, lists every configuration target, writes atomically with a `.bak` |
 | Safety | Snapshots of the whole configuration folder, crash recovery drafts, rotating log, clear error messages |
 | Interface | Original branding, dark and light themes, accent colour, keyboard shortcuts, no proprietary assets |
+| Tray | Native tray icon with show/hide, enable or bypass, configuration switching, settings and exit, plus close/minimise to tray |
+| Hotkeys | System-wide bindings for enable and previous/next configuration, configurable in Settings and released on exit |
+| Automation | Rules that activate a configuration when a chosen program is in the foreground, with an editor that can capture the current app |
 
 ## Install
 
 ### Installer
 
-Download `PeaceControl-Setup-1.0.1.exe` and run it. The installer adds Start
+Download `PeaceControl-Setup-1.1.0.exe` and run it. The installer adds Start
 menu shortcuts and an uninstaller under *Apps & features*. It requires
 administrator rights because it installs into `Program Files`.
 
@@ -49,7 +52,7 @@ them to be removed.
 
 ### Portable
 
-Download `PeaceControl-1.0.1-portable.zip`, unpack it anywhere and run
+Download `PeaceControl-1.1.0-portable.zip`, unpack it anywhere and run
 `PeaceControl.exe`. The folder contains a `peacecontrol.portable` marker, so
 settings, presets and logs are stored in `data\` next to the executable. Move
 the folder to move the whole installation, including onto a USB stick.
@@ -86,6 +89,8 @@ one device.
 | `Shift` + drag | Change a band frequency on the graph |
 | Right click a band or slider | Reset its gain to 0 dB |
 | `F1` | About, diagnostics and shortcut reference |
+| `Ctrl+Alt+P` | Global: enable or bypass the equalizer while any program is focused |
+| `Ctrl+Alt+Right` / `Ctrl+Alt+Left` | Global: next / previous configuration |
 
 ## Where files live
 
@@ -124,10 +129,14 @@ What is intentionally different:
 
 - PeaceControl stores its own presets as readable JSON; `.peace` is the
   interchange format.
-- Some original-only features are not reproduced: the system tray menu,
-  process triggered automation, global hotkeys, the peak value meter, the VST
-  configuration editor bridge, in-app update checks and the multilingual
-  interface. Effects that depended on those are still written correctly.
+- Device attachment automation is not reproduced: choose the configuration
+  target per device in Settings instead of letting the application follow the
+  default playback device automatically.
+- There is no peak value meter. PeaceControl only writes configuration files and
+  never sees the audio stream, so a meter here would be a decoration; Equalizer
+  APO's own readout still works. A simulated meter is deliberately not shipped.
+- The VST configuration editor bridge, in-app update checks and the multilingual
+  interface are not reproduced.
 - Some details are approximated from the shipped documentation and preset
   data because no decompiler was available for the original binary; see
   [docs/AUDIT.md](docs/AUDIT.md) and [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).

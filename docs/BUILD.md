@@ -54,7 +54,7 @@ Copy-Item target\release\peacecontrol.exe dist\portable\PeaceControl.exe
 Copy-Item target\release\peacecontrol-cli.exe dist\portable\
 New-Item -ItemType File dist\portable\peacecontrol.portable
 Copy-Item README.md, LICENSE dist\portable\
-Compress-Archive -Path dist\portable\* -DestinationPath dist\PeaceControl-1.0.1-portable.zip -Force
+Compress-Archive -Path dist\portable\* -DestinationPath dist\PeaceControl-1.1.0-portable.zip -Force
 ```
 
 With `peacecontrol.portable` beside the executable, settings, presets, logs and
@@ -71,12 +71,24 @@ everything again on uninstall.
 & "C:\Program Files (x86)\NSIS\makensis.exe" /DAPP_VERSION=1.0.0 installer\PeaceControl.nsi
 ```
 
-Output: `dist\PeaceControl-Setup-1.0.1.exe`.
+Output: `dist\PeaceControl-Setup-1.1.0.exe`.
 
 The uninstaller (`uninstall.exe`, written into the install folder) removes
 program files, shortcuts and registry entries. It asks before deleting
 `%APPDATA%\PeaceControl`, so user configurations survive a reinstall by default.
 A silent uninstall keeps user data.
+
+## Windows integration
+
+The tray icon, the global hotkeys and the foreground-application watcher use
+Win32 directly (`Shell_NotifyIconW`, `RegisterHotKey`, `GetForegroundWindow`)
+through the `windows-sys` bindings. They need an interactive desktop session:
+over a service or a session without an explorer shell, the application still
+runs and edits configurations, but reports in Settings that the tray and
+hotkeys are unavailable instead of pretending they work.
+
+Global hotkeys are registered only while PeaceControl runs and are released on
+exit. A combination already owned by another program is reported in Settings.
 
 ## Everything at once
 

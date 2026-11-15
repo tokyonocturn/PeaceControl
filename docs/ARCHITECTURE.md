@@ -27,6 +27,8 @@ No UI dependencies, no unsafe code (`#![forbid(unsafe_code)]`).
 | --- | --- |
 | `model` | `Preset`, `SpeakerEq`, `Band`, `FilterType`, `Effects`, `Surround`; ranges and clamping |
 | `dsp` | RBJ biquad coefficients and predicted magnitude response, graphic EQ sampling |
+| `automation` | Foreground process matching rules and the "only act on change" tracker |
+| `hotkeys` | Parsing and formatting of `Ctrl+Alt+P` style global hotkeys |
 | `render` | preset → Equalizer APO command text |
 | `parse` | Equalizer APO text → preset (channel blocks, filters, GraphicEQ, passthrough) |
 | `peace_ini` | interoperable `.peace` reader/writer |
@@ -109,7 +111,7 @@ Equalizer APO itself behaves.
 
 ## Testing
 
-The workspace has 135 unit and integration tests (no network, no GUI):
+The workspace has 152 unit and integration tests (no network, no GUI):
 
 - model invariants, clamping, filter code round trips;
 - biquad response: peak gain at centre, −3 dB at cutoff, shelf behaviour, band
@@ -124,7 +126,13 @@ The workspace has 135 unit and integration tests (no network, no GUI):
 - engine apply without a target, apply to a temporary file, snapshot guards;
 - CLI command behaviour against temporary files;
 - interface helpers: frequency/gain mapping, label formatting, status fade,
-  untitled numbering, slider mapping.
+  untitled numbering, slider mapping;
+- automation: process name normalisation, first-match-wins, the change tracker,
+  and the rule sanitiser that trims, drops empty rules and de-duplicates;
+- hotkeys: modifier and key parsing, rejection of unsafe combinations, name
+  round trips, and the filter that skips empty bindings;
+- the tray self test registers a real global hotkey through `RegisterHotKey` and
+  releases it again (it reports nothing to do when no desktop session exists).
 
 GUI rendering is not unit tested; it was smoke tested by starting the binary and
 confirming it creates its data folders, seeds the library and stays running.

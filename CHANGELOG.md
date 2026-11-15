@@ -4,6 +4,39 @@ All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-11-15
+
+Closes the last feature gaps against the original application: tray, global
+hotkeys and per-application automation are now real, not documented gaps.
+
+### Added
+
+- **Tray icon** created with `Shell_NotifyIconW`, with a native menu: show or
+  hide the window, enable or bypass the equalizer, switch configuration, open
+  settings and exit. Settings gains "Close to tray" and "Minimize to tray", and
+  a tray button in the header hides the window on demand.
+- **Global hotkeys** registered with `RegisterHotKey` while the application
+  runs: toggle the equalizer and step to the previous or next configuration.
+  All three are editable in Settings, validated as they are typed, re-registered
+  immediately when changed and released on exit. A combination owned by another
+  program is reported instead of failing silently.
+- **Per-application automation**: a rule maps a process name to a configuration.
+  The foreground process is sampled while automation is enabled, rules are
+  matched case-insensitively with an optional `.exe`, first match wins, and a
+  switch saves pending edits before activating the mapped configuration. The
+  Applications window lists, adds, edits and removes rules and can capture the
+  application currently in front.
+- **Global enable state** that actually bypasses the equalizer by writing an
+  empty target configuration, restorable from the header, the tray, the menu or
+  a hotkey.
+
+### Tests
+
+- 152 tests. New coverage for process normalisation and rule matching, the
+  automation change tracker, hotkey parsing and formatting, the settings
+  sanitiser for rules and hotkeys, the bypass writer, and a real global hotkey
+  registration and release on Windows.
+
 ## [1.0.1] - 2026-11-15
 
 Closes the gaps found when checking the interface against the feature list.

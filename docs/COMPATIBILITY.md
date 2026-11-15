@@ -98,10 +98,11 @@ visually equivalent but not bit identical to the original convolution.
 | Device-specific config selection | Yes | Yes |
 | Automatic backups | Yes | Yes |
 | Hotkeys (in application) | Yes | Yes |
-| Global hotkeys | Yes | No |
-| Tray menu | Yes | No |
-| Process/device automation rules | Yes | No |
-| Peak value meter | Yes | No (proprietary helper DLL) |
+| Global hotkeys | Yes | Yes, three configurable bindings registered with Windows |
+| Tray menu | Yes | Yes: show/hide, enable, configurations, settings, exit |
+| Process automation rules | Yes | Yes, foreground process matched against user rules |
+| Device attachment automation | Yes | No, choose a configuration target per device manually |
+| Peak value meter | Yes | No: PeaceControl never touches the audio stream, so it has no samples to meter; Equalizer APO's own readout is unaffected |
 | Update check / website integrations | Yes | No (offline by design) |
 | Languages | 10+ | English |
 | Themes/skins | Yes | Dark/light + accent colour |
@@ -124,5 +125,20 @@ visually equivalent but not bit identical to the original convolution.
 4. **Live apply.** When "Apply automatically" is on, the target file is rewritten
    shortly after an edit completes. Equalizer APO reloads it; this can produce a
    short audio interruption, exactly as editing the file by hand does.
-5. **No tray icon.** Closing the window exits; autostart is supported through a
-   per user `Run` entry when enabled in Settings.
+5. **Tray and hotkeys.** The tray icon exists while the application runs and
+   disappears when it exits; there is no "always resident" background service.
+   Hotkeys are registered with `RegisterHotKey`, so a combination another program
+   already owns is reported in Settings instead of silently doing nothing. Leaving
+   a hotkey field empty disables that binding.
+6. **Enabling and bypassing.** Switching the equalizer off writes an empty
+   configuration file, which is how Equalizer APO is told to stop applying
+   filters. The previous file is kept as `.bak` by the atomic writer, and turning
+   the equalizer back on renders the current configuration again.
+7. **Automation scope.** Only the process that owns the foreground window is
+   matched, by name and case-insensitively with an optional `.exe`. Rules are
+   evaluated in order and the first match wins; a rule whose configuration was
+   deleted is ignored. Nothing is matched while PeaceControl itself is in front,
+   and when no rule matches the current configuration is left alone.
+8. **Automation and unsaved work.** Switching configurations through the tray, a
+   hotkey or a rule saves the configuration being edited first, so a switch never
+   discards changes.
