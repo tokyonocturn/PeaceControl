@@ -73,16 +73,16 @@ changes, generated binaries, `analysis/` or `dist/`.
 ## Releasing
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Version 1.1.0
+powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Version 1.2.0
 ```
 
 That runs the tests, builds optimised binaries, produces
-`dist\PeaceControl-1.1.0-portable.zip` and, when NSIS is installed,
-`dist\PeaceControl-Setup-1.1.0.exe`. Then:
+`dist\PeaceControl-1.2.0-portable.zip` and, when NSIS is installed,
+`dist\PeaceControl-Setup-1.2.0.exe`. Then:
 
 1. Update `Cargo.toml`, `CHANGELOG.md`, the README download names and the audit
    or compatibility docs for anything the release changes.
-2. Tag the commit (`git tag -a v1.1.0`) and push it with the branch.
+2. Tag the commit (`git tag -a v1.2.0`) and push it with the branch.
 3. Attach both artefacts to the GitHub release.
 4. Verify by cloning the tag into a clean directory and running
    `cargo build --release` and `cargo test` there.

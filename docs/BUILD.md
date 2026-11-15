@@ -22,7 +22,7 @@ registry and native file dialogs.
 ## Build and test
 
 ```powershell
-cargo test --workspace        # 133 tests
+cargo test --workspace        # 158 tests
 cargo build                   # debug binaries in target\debug
 cargo build --release         # release binaries in target\release
 ```
@@ -54,7 +54,7 @@ Copy-Item target\release\peacecontrol.exe dist\portable\PeaceControl.exe
 Copy-Item target\release\peacecontrol-cli.exe dist\portable\
 New-Item -ItemType File dist\portable\peacecontrol.portable
 Copy-Item README.md, LICENSE dist\portable\
-Compress-Archive -Path dist\portable\* -DestinationPath dist\PeaceControl-1.1.0-portable.zip -Force
+Compress-Archive -Path dist\portable\* -DestinationPath dist\PeaceControl-1.2.0-portable.zip -Force
 ```
 
 With `peacecontrol.portable` beside the executable, settings, presets, logs and
@@ -71,7 +71,7 @@ everything again on uninstall.
 & "C:\Program Files (x86)\NSIS\makensis.exe" /DAPP_VERSION=1.0.0 installer\PeaceControl.nsi
 ```
 
-Output: `dist\PeaceControl-Setup-1.1.0.exe`.
+Output: `dist\PeaceControl-Setup-1.2.0.exe`.
 
 The uninstaller (`uninstall.exe`, written into the install folder) removes
 program files, shortcuts and registry entries. It asks before deleting
@@ -98,6 +98,26 @@ powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1 -Version 1.0.
 
 This runs the tests, builds release binaries, creates the portable zip and, when
 NSIS is installed, the setup executable. Output lands in `dist\`.
+
+## Verifying the tray menu
+
+`scripts/verify-tray.ps1` starts a portable copy of the release build in a
+temporary folder, drives the tray menu the way Explorer does (posting the
+`WM_COMMAND` message each item carries to the `PeaceControlShellWindow` window)
+and asserts the real result of every command: the window is parked off-screen
+and restored, the equalizer state and the applied configuration change, the
+chosen configuration is persisted, the settings window opens, close and minimise
+to tray keep the process alive, and a restart keeps the menu's changes. It exits
+non-zero on the first failed check and leaves its temporary data behind for
+inspection.
+
+```powershell
+cargo build --release
+powershell -ExecutionPolicy Bypass -File scriptserify-tray.ps1
+```
+
+It needs an interactive desktop session, because a tray icon cannot exist
+without one.
 
 ## Verifying a build
 

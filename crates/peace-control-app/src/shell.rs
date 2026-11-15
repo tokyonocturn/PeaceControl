@@ -114,6 +114,8 @@ impl PeaceApp {
             ShellEvent::OpenSettings => {
                 self.set_window_visible(ctx, true);
                 self.windows.settings = true;
+                log::info!("settings window opened from the tray");
+                self.status("Settings", StatusKind::Info);
             }
             ShellEvent::Exit => self.quit(ctx),
             ShellEvent::ActivatePreset(name) => self.activate_preset(&name, "tray menu"),
@@ -123,13 +125,20 @@ impl PeaceApp {
     }
 
     pub(crate) fn set_window_visible(&mut self, ctx: &egui::Context, visible: bool) {
+        log::info!("window {}", if visible { "shown" } else { "hidden" });
         self.window_visible = visible;
         if visible {
+            crate::tray::show_window();
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
             ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
             ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
         } else {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+            // Restore from a minimised state first: a minimised window does not
+            // paint either, and painting is what keeps the tray responsive.
+            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+            if !crate::tray::hide_window() {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+            }
         }
     }
 
@@ -194,15 +203,9 @@ impl PeaceApp {
             .iter()
             .map(|entry| entry.name.clone())
             .collect();
-        if names.is_empty() {
+        let Some(name) = cycle_preset(&names, &self.preset.name, delta) else {
             return;
-        }
-        let current = names
-            .iter()
-            .position(|name| *name == self.preset.name)
-            .unwrap_or(0) as i32;
-        let next = (current + delta).rem_euclid(names.len() as i32) as usize;
-        let name = names[next].clone();
+        };
         self.activate_preset(&name, "hotkey");
         if !self.settings.enabled {
             self.status(
@@ -298,6 +301,19 @@ impl PeaceApp {
     }
 }
 
+/// The next configuration name in `names`, wrapping at both ends.
+///
+/// A configuration that is no longer in the list restarts from the first entry,
+/// which is what a user sees after deleting the active configuration.
+pub(crate) fn cycle_preset(names: &[String], current: &str, delta: i32) -> Option<String> {
+    if names.is_empty() {
+        return None;
+    }
+    let index = names.iter().position(|name| name == current).unwrap_or(0) as i32;
+    let next = (index + delta).rem_euclid(names.len() as i32) as usize;
+    Some(names[next].clone())
+}
+
 /// Turns the three configured hotkeys into registrations, skipping blanks.
 pub(crate) fn bindings_from(
     settings: &peace_control_core::Settings,
@@ -316,6 +332,16 @@ pub(crate) fn bindings_from(
 mod tests {
     use super::*;
     use peace_control_core::Settings;
+
+    #[test]
+    fn cycling_steps_and_wraps() {
+        let names = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+        assert_eq!(cycle_preset(&names, "A", 1).as_deref(), Some("B"));
+        assert_eq!(cycle_preset(&names, "C", 1).as_deref(), Some("A"));
+        assert_eq!(cycle_preset(&names, "A", -1).as_deref(), Some("C"));
+        assert_eq!(cycle_preset(&names, "missing", 1).as_deref(), Some("B"));
+        assert_eq!(cycle_preset(&[], "A", 1), None);
+    }
 
     #[test]
     fn only_configured_hotkeys_are_registered() {

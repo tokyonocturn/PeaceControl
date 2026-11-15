@@ -34,7 +34,7 @@ contains no code or assets from them.
 | Files | Detects the Equalizer APO installation, lists every configuration target, writes atomically with a `.bak` |
 | Safety | Snapshots of the whole configuration folder, crash recovery drafts, rotating log, clear error messages |
 | Interface | Original branding, dark and light themes, accent colour, keyboard shortcuts, no proprietary assets |
-| Tray | Native tray icon with show/hide, enable or bypass, configuration switching, settings and exit, plus close/minimise to tray |
+| Tray | Native tray icon and real `WM_COMMAND` menu: show/hide, enable or bypass, configuration switching, settings and exit, plus close/minimise to tray. Running in the tray parks the window off-screen so commands keep working |
 | Hotkeys | System-wide bindings for enable and previous/next configuration, configurable in Settings and released on exit |
 | Automation | Rules that activate a configuration when a chosen program is in the foreground, with an editor that can capture the current app |
 
@@ -42,7 +42,7 @@ contains no code or assets from them.
 
 ### Installer
 
-Download `PeaceControl-Setup-1.1.0.exe` and run it. The installer adds Start
+Download `PeaceControl-Setup-1.2.0.exe` and run it. The installer adds Start
 menu shortcuts and an uninstaller under *Apps & features*. It requires
 administrator rights because it installs into `Program Files`.
 
@@ -52,7 +52,7 @@ them to be removed.
 
 ### Portable
 
-Download `PeaceControl-1.1.0-portable.zip`, unpack it anywhere and run
+Download `PeaceControl-1.2.0-portable.zip`, unpack it anywhere and run
 `PeaceControl.exe`. The folder contains a `peacecontrol.portable` marker, so
 settings, presets and logs are stored in `data\` next to the executable. Move
 the folder to move the whole installation, including onto a USB stick.

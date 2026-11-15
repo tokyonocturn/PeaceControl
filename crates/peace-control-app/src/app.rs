@@ -737,6 +737,13 @@ fn next_copy(name: &str) -> String {
 
 impl eframe::App for PeaceApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        // The tray icon, the global hotkeys and application automation all
+        // report through window messages or foreground-process samples that
+        // are only drained on a repaint. egui idles completely when nothing
+        // changes, so a slow heartbeat keeps those features alive instead of
+        // waiting for the pointer to move over the window.
+        ctx.request_repaint_after(std::time::Duration::from_millis(250));
+
         // Closing can keep running in the tray instead of quitting.
         if ctx.input(|input| input.viewport().close_requested()) && !self.allow_close {
             if self.settings.close_to_tray {

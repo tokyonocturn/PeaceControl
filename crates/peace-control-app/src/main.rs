@@ -58,6 +58,9 @@ fn main() -> eframe::Result<()> {
             .with_app_id("peacecontrol")
             .with_icon(std::sync::Arc::new(icon)),
         renderer: eframe::Renderer::Glow,
+        // Running in the tray parks the window off-screen, so egui must not
+        // remember that position for the next launch.
+        persist_window: false,
         ..Default::default()
     };
 

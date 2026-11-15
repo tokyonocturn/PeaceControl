@@ -4,6 +4,40 @@ All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-11-15
+
+Makes the tray menu work through the same path Windows uses, keeps it available
+while the application runs in the tray, and proves it end to end.
+
+### Added
+
+- The tray menu is built from data (`menu_tree`) with stable command identifiers,
+  so labels, check marks and identifiers can be tested without a desktop.
+- `Shell::post_command` and an in-tree test that posts real `WM_COMMAND`
+  messages and asserts the resulting events.
+- `scripts/verify-tray.ps1`: an end-to-end check that drives a running build by
+  posting the `WM_COMMAND` messages the menu items carry, then asserts window
+  position and extended style, `settings.json`, the applied configuration, the
+  log and a restart.
+
+### Fixed
+
+- **Tray and hotkey commands could not be reached at all.** The popup menu used
+  `TPM_RETURNCMD` and handled the result inline, so no `WM_COMMAND` was ever
+  produced; posted commands were ignored and a menu selection ran a second,
+  different code path. Selections now arrive as `WM_COMMAND`, exactly like
+  Explorer sends them, and every command is decoded in one place.
+- **Running in the tray stopped all shell integration.** Hiding the window also
+  stopped egui from calling `update`, which is what drains the tray and hotkey
+  queue, so Show did nothing and hotkeys went dead. Close to tray, minimize to
+  tray and the tray button now park the window off-screen without a taskbar
+  button, which keeps the queue draining; Show restores the saved position.
+- **The idle interface never repainted**, so tray, hotkey and automation polling
+  could wait indefinitely for pointer movement. The interface requests a repaint
+  every 250 ms.
+- Settings opened from the tray is now recorded in the log, and the tooltip,
+  check marks and status line follow the state the command actually set.
+
 ## [1.1.0] - 2026-11-15
 
 Closes the last feature gaps against the original application: tray, global

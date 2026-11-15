@@ -99,7 +99,7 @@ visually equivalent but not bit identical to the original convolution.
 | Automatic backups | Yes | Yes |
 | Hotkeys (in application) | Yes | Yes |
 | Global hotkeys | Yes | Yes, three configurable bindings registered with Windows |
-| Tray menu | Yes | Yes: show/hide, enable, configurations, settings, exit |
+| Tray menu | Yes | Yes: show/hide, enable, configurations, settings, exit, all dispatched through `WM_COMMAND` |
 | Process automation rules | Yes | Yes, foreground process matched against user rules |
 | Device attachment automation | Yes | No, choose a configuration target per device manually |
 | Peak value meter | Yes | No: PeaceControl never touches the audio stream, so it has no samples to meter; Equalizer APO's own readout is unaffected |
@@ -127,9 +127,14 @@ visually equivalent but not bit identical to the original convolution.
    short audio interruption, exactly as editing the file by hand does.
 5. **Tray and hotkeys.** The tray icon exists while the application runs and
    disappears when it exits; there is no "always resident" background service.
-   Hotkeys are registered with `RegisterHotKey`, so a combination another program
-   already owns is reported in Settings instead of silently doing nothing. Leaving
-   a hotkey field empty disables that binding.
+   Menu selections arrive as `WM_COMMAND`, the message Explorer sends, so a menu
+   click and a posted command run the same handler. While the application runs in
+   the tray its window is parked off-screen without a taskbar button rather than
+   hidden: Windows does not paint a hidden window, and the interface only drains
+   tray and hotkey events while it paints. Show puts the window back at the
+   position it was parked from. Hotkeys are registered with `RegisterHotKey`, so a
+   combination another program already owns is reported in Settings instead of
+   silently doing nothing. Leaving a hotkey field empty disables that binding.
 6. **Enabling and bypassing.** Switching the equalizer off writes an empty
    configuration file, which is how Equalizer APO is told to stop applying
    filters. The previous file is kept as `.bak` by the atomic writer, and turning

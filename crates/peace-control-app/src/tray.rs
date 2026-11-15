@@ -1,13 +1,15 @@
 //! Windows shell integration: tray icon, global hotkeys, foreground process.
 //!
 //! The application creates one hidden window that receives the tray icon
-//! callbacks and the global hotkeys. Its messages are pumped from the interface
-//! loop with `PeekMessage` filtered to that window, so the tray keeps working
-//! while egui owns the main window and no second event loop is needed.
+//! callbacks, the global hotkeys and the tray menu's `WM_COMMAND` messages. Its
+//! messages are pumped from the interface loop with `PeekMessage` filtered to
+//! that window, so the tray keeps working while egui owns the main window and
+//! no second event loop is needed.
 //!
-//! Nothing here is simulated: the tray icon is a real `Shell_NotifyIconW` entry
-//! with a native popup menu, hotkeys are registered with `RegisterHotKey` and
-//! released in `Drop`, and the foreground process is read from the Win32 API.
+//! Nothing here is simulated: the tray icon is a real `Shell_NotifyIconW` entry,
+//! the popup is a real Win32 menu whose selections arrive as `WM_COMMAND`
+//! (exactly what Explorer sends), hotkeys are registered with `RegisterHotKey`
+//! and released in `Drop`, and the foreground process is read from Win32.
 
 use peace_control_core::automation::normalize_process;
 
@@ -45,6 +47,60 @@ impl HotkeyAction {
     }
 }
 
+/// One selectable tray menu command, with the identifier Windows puts in
+/// `WM_COMMAND` when the item is chosen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MenuCommand {
+    ToggleWindow,
+    ToggleEnabled,
+    OpenSettings,
+    Exit,
+    /// Index into the configuration list shown in the menu.
+    Preset(usize),
+}
+
+impl MenuCommand {
+    pub const PRESET_BASE: usize = 1000;
+
+    pub fn id(self) -> usize {
+        match self {
+            MenuCommand::ToggleWindow => 1,
+            MenuCommand::ToggleEnabled => 2,
+            MenuCommand::OpenSettings => 3,
+            MenuCommand::Exit => 4,
+            MenuCommand::Preset(index) => Self::PRESET_BASE + index,
+        }
+    }
+
+    pub fn from_id(id: usize) -> Option<MenuCommand> {
+        match id {
+            1 => Some(MenuCommand::ToggleWindow),
+            2 => Some(MenuCommand::ToggleEnabled),
+            3 => Some(MenuCommand::OpenSettings),
+            4 => Some(MenuCommand::Exit),
+            id if id >= Self::PRESET_BASE => Some(MenuCommand::Preset(id - Self::PRESET_BASE)),
+            _ => None,
+        }
+    }
+}
+
+/// A node of the popup menu. The menu is described as data so its labels,
+/// identifiers and check marks can be asserted in tests without a desktop.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MenuNode {
+    Item {
+        label: String,
+        command: Option<MenuCommand>,
+        checked: bool,
+        enabled: bool,
+    },
+    Separator,
+    Submenu {
+        label: String,
+        items: Vec<MenuNode>,
+    },
+}
+
 /// Everything the tray menu needs to describe the current state.
 pub struct MenuState<'a> {
     pub presets: &'a [String],
@@ -53,15 +109,95 @@ pub struct MenuState<'a> {
     pub preset_playing: &'a str,
 }
 
+/// Builds the popup menu contents for the given state.
+///
+/// The check marks come straight from the live state, so reopening the menu
+/// always reflects what the application is currently doing.
+pub fn menu_tree(state: &MenuState<'_>) -> Vec<MenuNode> {
+    let mut nodes = Vec::new();
+    nodes.push(MenuNode::Item {
+        label: if state.visible {
+            "Hide PeaceControl".to_string()
+        } else {
+            "Show PeaceControl".to_string()
+        },
+        command: Some(MenuCommand::ToggleWindow),
+        checked: false,
+        enabled: true,
+    });
+    nodes.push(MenuNode::Item {
+        label: "Equalizer enabled".to_string(),
+        command: Some(MenuCommand::ToggleEnabled),
+        checked: state.enabled,
+        enabled: true,
+    });
+    nodes.push(MenuNode::Separator);
+
+    if state.presets.is_empty() {
+        nodes.push(MenuNode::Item {
+            label: "No configurations".to_string(),
+            command: None,
+            checked: false,
+            enabled: false,
+        });
+    } else {
+        nodes.push(MenuNode::Submenu {
+            label: "Configurations".to_string(),
+            items: state
+                .presets
+                .iter()
+                .take(30)
+                .enumerate()
+                .map(|(index, name)| MenuNode::Item {
+                    label: name.clone(),
+                    command: Some(MenuCommand::Preset(index)),
+                    checked: name == state.preset_playing,
+                    enabled: true,
+                })
+                .collect(),
+        });
+    }
+
+    nodes.push(MenuNode::Separator);
+    nodes.push(MenuNode::Item {
+        label: "Settings…".to_string(),
+        command: Some(MenuCommand::OpenSettings),
+        checked: false,
+        enabled: true,
+    });
+    nodes.push(MenuNode::Item {
+        label: "Exit".to_string(),
+        command: Some(MenuCommand::Exit),
+        checked: false,
+        enabled: true,
+    });
+    nodes
+}
+
+/// Turns a `WM_COMMAND` identifier plus the visible configuration list into an
+/// application event. This is the single place menu identifiers are decoded.
+pub fn event_for_command(command: MenuCommand, presets: &[String]) -> Option<ShellEvent> {
+    match command {
+        MenuCommand::ToggleWindow => Some(ShellEvent::ToggleWindow),
+        MenuCommand::ToggleEnabled => Some(ShellEvent::ToggleEnabled),
+        MenuCommand::OpenSettings => Some(ShellEvent::OpenSettings),
+        MenuCommand::Exit => Some(ShellEvent::Exit),
+        MenuCommand::Preset(index) => presets.get(index).cloned().map(ShellEvent::ActivatePreset),
+    }
+}
+
 #[cfg(windows)]
 mod sys {
-    use super::{normalize_process, HotkeyAction, MenuState, ShellEvent};
+    use super::{
+        event_for_command, menu_tree, normalize_process, HotkeyAction, MenuCommand, MenuNode,
+        MenuState, ShellEvent,
+    };
     use peace_control_core::hotkeys::Hotkey;
     use std::ffi::c_void;
     use std::mem::size_of;
     use std::ptr::{null, null_mut};
     use std::sync::Mutex;
-    use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+    use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
     use windows_sys::Win32::Graphics::Gdi::{
         CreateBitmap, CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, GetDC,
         ReleaseDC, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
@@ -79,27 +215,121 @@ mod sys {
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         AppendMenuW, CreateIconIndirect, CreatePopupMenu, CreateWindowExW, DefWindowProcW,
-        DestroyIcon, DestroyMenu, DestroyWindow, DispatchMessageW, GetForegroundWindow,
-        GetWindowThreadProcessId, LoadCursorW, PeekMessageW, PostMessageW, RegisterClassW,
-        SetForegroundWindow, TrackPopupMenu, TranslateMessage, HICON, ICONINFO, IDC_ARROW,
-        MF_CHECKED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, PM_REMOVE, TPM_LEFTBUTTON,
-        TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_APP, WM_CONTEXTMENU, WM_HOTKEY,
-        WM_LBUTTONUP, WM_NULL, WM_RBUTTONUP, WNDCLASSW,
+        DestroyIcon, DestroyMenu, DestroyWindow, DispatchMessageW, FindWindowW,
+        GetForegroundWindow, GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId,
+        LoadCursorW, PeekMessageW, PostMessageW, RegisterClassW, SetForegroundWindow,
+        SetWindowLongPtrW, SetWindowPos, ShowWindow, TrackPopupMenu, TranslateMessage, GWL_EXSTYLE,
+        HICON, HMENU, ICONINFO, IDC_ARROW, MF_CHECKED, MF_GRAYED, MF_POPUP, MF_SEPARATOR,
+        MF_STRING, MSG, PM_REMOVE, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW,
+        SW_RESTORE, SW_SHOWNOACTIVATE, TPM_LEFTBUTTON, TPM_RIGHTBUTTON, WM_APP, WM_COMMAND,
+        WM_CONTEXTMENU, WM_HOTKEY, WM_LBUTTONUP, WM_NULL, WM_RBUTTONUP, WNDCLASSW, WS_EX_APPWINDOW,
+        WS_EX_TOOLWINDOW,
     };
 
     const TRAY_MESSAGE: u32 = WM_APP + 1;
-    const MENU_SHOW: usize = 1;
-    const MENU_TOGGLE: usize = 2;
-    const MENU_SETTINGS: usize = 3;
-    const MENU_EXIT: usize = 4;
-    const MENU_PRESET_HEADER: usize = 5;
-    const MENU_PRESET_BASE: usize = 1000;
+
+    /// Where the main window is parked while the application runs in the tray.
+    /// The window stays shown (off-screen) rather than hidden, because Windows
+    /// stops painting a hidden window and egui only calls `update` while it
+    /// paints - and `update` is what drains the tray and hotkey queue.
+    const PARKED: i32 = -24000;
+
+    /// The rectangle the window was last shown at, so Show restores it exactly.
+    static LAST_SHOWN: Mutex<Option<(i32, i32, i32, i32)>> = Mutex::new(None);
+
+    /// The application's main window, matched by title and owned by this process.
+    fn main_window() -> Option<HWND> {
+        unsafe {
+            let title = wide(&format!("PeaceControl {}", peace_control_core::VERSION));
+            let hwnd = FindWindowW(std::ptr::null(), title.as_ptr());
+            if hwnd.is_null() {
+                return None;
+            }
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(hwnd, &mut pid);
+            if pid != windows_sys::Win32::System::Threading::GetCurrentProcessId() {
+                return None;
+            }
+            Some(hwnd)
+        }
+    }
+
+    /// Parks the main window off-screen without a taskbar button.
+    ///
+    /// Returns false when the window cannot be found, which lets the caller fall
+    /// back to a plain hide.
+    pub fn hide_window() -> bool {
+        let Some(hwnd) = main_window() else {
+            log::warn!("could not find the main window to park it in the tray");
+            return false;
+        };
+        unsafe {
+            let mut rect: RECT = std::mem::zeroed();
+            if GetWindowRect(hwnd, &mut rect) != 0 && rect.left > PARKED {
+                if let Ok(mut saved) = LAST_SHOWN.lock() {
+                    *saved = Some((
+                        rect.left,
+                        rect.top,
+                        rect.right - rect.left,
+                        rect.bottom - rect.top,
+                    ));
+                }
+            }
+            let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+            SetWindowLongPtrW(
+                hwnd,
+                GWL_EXSTYLE,
+                (style | WS_EX_TOOLWINDOW as isize) & !(WS_EX_APPWINDOW as isize),
+            );
+            ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+            SetWindowPos(
+                hwnd,
+                std::ptr::null_mut(),
+                PARKED,
+                PARKED,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
+        true
+    }
+
+    /// Brings the window back on screen at the rectangle it was parked from.
+    pub fn show_window() -> bool {
+        let Some(hwnd) = main_window() else {
+            log::warn!("could not find the main window to restore it");
+            return false;
+        };
+        let saved = LAST_SHOWN.lock().ok().and_then(|rect| *rect);
+        unsafe {
+            let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+            SetWindowLongPtrW(
+                hwnd,
+                GWL_EXSTYLE,
+                (style & !(WS_EX_TOOLWINDOW as isize)) | WS_EX_APPWINDOW as isize,
+            );
+            let mut flags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW;
+            let (x, y, width, height) = match saved {
+                Some((x, y, width, height)) => (x, y, width, height),
+                None => {
+                    flags |= SWP_NOSIZE;
+                    (160, 120, 0, 0)
+                }
+            };
+            SetWindowPos(hwnd, std::ptr::null_mut(), x, y, width, height, flags);
+            ShowWindow(hwnd, SW_RESTORE);
+            SetForegroundWindow(hwnd);
+        }
+        true
+    }
 
     /// Events recorded by the window procedure and drained by `Shell::poll`.
     enum RawEvent {
         TrayLeft,
         TrayRight,
         Hotkey(i32),
+        Command(usize),
     }
 
     static EVENTS: Mutex<Vec<RawEvent>> = Mutex::new(Vec::new());
@@ -128,6 +358,12 @@ mod sys {
                 } else if mouse == WM_RBUTTONUP || mouse == WM_CONTEXTMENU {
                     push(RawEvent::TrayRight);
                 }
+                0
+            }
+            // WM_COMMAND is what Windows sends when a menu item is chosen, so
+            // real clicks and posted commands share this exact path.
+            WM_COMMAND => {
+                push(RawEvent::Command(wparam & 0xFFFF));
                 0
             }
             WM_HOTKEY => {
@@ -180,6 +416,41 @@ mod sys {
             DeleteDC(dc);
             ReleaseDC(null_mut(), screen);
             icon
+        }
+    }
+
+    /// Appends a menu tree to a Win32 popup menu.
+    unsafe fn append_nodes(menu: HMENU, nodes: &[MenuNode]) {
+        for node in nodes {
+            match node {
+                MenuNode::Separator => {
+                    let _ = AppendMenuW(menu, MF_SEPARATOR, 0, null());
+                }
+                MenuNode::Item {
+                    label,
+                    command,
+                    checked,
+                    enabled,
+                } => {
+                    let mut flags = MF_STRING;
+                    if *checked {
+                        flags |= MF_CHECKED;
+                    }
+                    if !*enabled {
+                        flags |= MF_GRAYED;
+                    }
+                    let id = command.map(MenuCommand::id).unwrap_or(0);
+                    let _ = AppendMenuW(menu, flags, id, wide(label).as_ptr());
+                }
+                MenuNode::Submenu { label, items } => {
+                    let submenu = CreatePopupMenu();
+                    if submenu.is_null() {
+                        continue;
+                    }
+                    append_nodes(submenu, items);
+                    let _ = AppendMenuW(menu, MF_POPUP, submenu as usize, wide(label).as_ptr());
+                }
+            }
         }
     }
 
@@ -285,6 +556,17 @@ mod sys {
             }
         }
 
+        /// Sends a menu command exactly as the shell does after a selection.
+        ///
+        /// This posts `WM_COMMAND` to the tray window, which is the same message
+        /// a real menu click produces, so tests and users share one code path.
+        #[cfg(test)]
+        pub fn post_command(&self, command: MenuCommand) {
+            unsafe {
+                let _ = PostMessageW(self.hwnd, WM_COMMAND, command.id(), 0);
+            }
+        }
+
         /// Registers every binding and returns the ones Windows rejected.
         ///
         /// Existing registrations are released first so editing a hotkey frees
@@ -354,11 +636,7 @@ mod sys {
             for event in raw {
                 match event {
                     RawEvent::TrayLeft => output.push(ShellEvent::ToggleWindow),
-                    RawEvent::TrayRight => {
-                        if let Some(choice) = self.popup_menu(state) {
-                            output.push(choice);
-                        }
-                    }
+                    RawEvent::TrayRight => self.popup_menu(state),
                     RawEvent::Hotkey(id) => match id {
                         id if id == HotkeyAction::Toggle.id() => {
                             output.push(ShellEvent::HotkeyToggle)
@@ -369,71 +647,37 @@ mod sys {
                         }
                         _ => {}
                     },
+                    RawEvent::Command(id) => {
+                        if let Some(command) = MenuCommand::from_id(id) {
+                            if let Some(event) = event_for_command(command, state.presets) {
+                                output.push(event);
+                            } else {
+                                log::warn!("tray command {id} refers to a missing configuration");
+                            }
+                        } else {
+                            log::warn!("unknown tray command id {id}");
+                        }
+                    }
                 }
             }
             output
         }
 
-        /// Shows the native context menu and returns the chosen action.
-        fn popup_menu(&self, state: &MenuState<'_>) -> Option<ShellEvent> {
+        /// Shows the native context menu. Selections arrive later as
+        /// `WM_COMMAND` and are decoded by [`Shell::poll`].
+        fn popup_menu(&self, state: &MenuState<'_>) {
             unsafe {
                 let menu = CreatePopupMenu();
                 if menu.is_null() {
-                    return None;
+                    return;
                 }
-                let show_label = if state.visible {
-                    "Hide PeaceControl"
-                } else {
-                    "Show PeaceControl"
-                };
-                let _ = AppendMenuW(menu, MF_STRING, MENU_SHOW, wide(show_label).as_ptr());
-                let toggle_flags = MF_STRING | if state.enabled { MF_CHECKED } else { 0 };
-                let _ = AppendMenuW(
-                    menu,
-                    toggle_flags,
-                    MENU_TOGGLE,
-                    wide("Equalizer enabled").as_ptr(),
-                );
-                let _ = AppendMenuW(menu, MF_SEPARATOR, 0, null());
-
-                if state.presets.is_empty() {
-                    let _ = AppendMenuW(
-                        menu,
-                        MF_STRING | MF_GRAYED,
-                        MENU_PRESET_HEADER,
-                        wide("No configurations").as_ptr(),
-                    );
-                } else {
-                    let header = CreatePopupMenu();
-                    for (index, name) in state.presets.iter().take(30).enumerate() {
-                        let flags = MF_STRING
-                            | if name == state.preset_playing {
-                                MF_CHECKED
-                            } else {
-                                0
-                            };
-                        let _ = AppendMenuW(
-                            header,
-                            flags,
-                            MENU_PRESET_BASE + index,
-                            wide(name).as_ptr(),
-                        );
-                    }
-                    let _ = AppendMenuW(
-                        menu,
-                        MF_POPUP,
-                        header as usize,
-                        wide("Configurations").as_ptr(),
-                    );
-                }
-                let _ = AppendMenuW(menu, MF_SEPARATOR, 0, null());
-                let _ = AppendMenuW(menu, MF_STRING, MENU_SETTINGS, wide("Settings…").as_ptr());
-                let _ = AppendMenuW(menu, MF_STRING, MENU_EXIT, wide("Exit").as_ptr());
-
+                append_nodes(menu, &menu_tree(state));
                 let _ = SetForegroundWindow(self.hwnd);
-                let choice = TrackPopupMenu(
+                // Without TPM_RETURNCMD Windows posts the selection as
+                // WM_COMMAND to this window, which is the path a user takes.
+                let _ = TrackPopupMenu(
                     menu,
-                    TPM_RETURNCMD | TPM_NONOTIFY | TPM_LEFTBUTTON | TPM_RIGHTBUTTON,
+                    TPM_LEFTBUTTON | TPM_RIGHTBUTTON,
                     0,
                     0,
                     0,
@@ -442,21 +686,6 @@ mod sys {
                 );
                 let _ = PostMessageW(self.hwnd, WM_NULL, 0, 0);
                 let _ = DestroyMenu(menu);
-
-                let choice = choice as usize;
-                match choice {
-                    0 => None,
-                    MENU_SHOW => Some(ShellEvent::ToggleWindow),
-                    MENU_TOGGLE => Some(ShellEvent::ToggleEnabled),
-                    MENU_SETTINGS => Some(ShellEvent::OpenSettings),
-                    MENU_EXIT => Some(ShellEvent::Exit),
-                    other if other >= MENU_PRESET_BASE => state
-                        .presets
-                        .get(other - MENU_PRESET_BASE)
-                        .cloned()
-                        .map(ShellEvent::ActivatePreset),
-                    _ => None,
-                }
             }
         }
     }
@@ -510,7 +739,7 @@ mod sys {
 }
 
 #[cfg(windows)]
-pub use sys::{foreground_process, Shell};
+pub use sys::{foreground_process, hide_window, show_window, Shell};
 
 #[cfg(not(windows))]
 pub struct Shell;
@@ -521,6 +750,8 @@ impl Shell {
         None
     }
     pub fn set_tooltip(&self, _tooltip: &str) {}
+    #[cfg(test)]
+    pub fn post_command(&self, _command: MenuCommand) {}
     pub fn register(&mut self, _bindings: &[(String, HotkeyAction)]) -> Vec<String> {
         vec!["global hotkeys are only implemented on Windows".to_string()]
     }
@@ -535,9 +766,44 @@ pub fn foreground_process() -> Option<String> {
     None
 }
 
+#[cfg(not(windows))]
+pub fn hide_window() -> bool {
+    false
+}
+
+#[cfg(not(windows))]
+pub fn show_window() -> bool {
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn state<'a>(
+        presets: &'a [String],
+        enabled: bool,
+        visible: bool,
+        playing: &'a str,
+    ) -> MenuState<'a> {
+        MenuState {
+            presets,
+            enabled,
+            visible,
+            preset_playing: playing,
+        }
+    }
+
+    fn labels(nodes: &[MenuNode]) -> Vec<String> {
+        nodes
+            .iter()
+            .map(|node| match node {
+                MenuNode::Item { label, .. } => label.clone(),
+                MenuNode::Separator => "---".to_string(),
+                MenuNode::Submenu { label, .. } => label.clone(),
+            })
+            .collect()
+    }
 
     #[test]
     fn hotkey_ids_are_stable_and_unique() {
@@ -547,30 +813,170 @@ mod tests {
     }
 
     #[test]
+    fn command_ids_round_trip() {
+        for command in [
+            MenuCommand::ToggleWindow,
+            MenuCommand::ToggleEnabled,
+            MenuCommand::OpenSettings,
+            MenuCommand::Exit,
+            MenuCommand::Preset(0),
+            MenuCommand::Preset(7),
+            MenuCommand::Preset(29),
+        ] {
+            assert_eq!(MenuCommand::from_id(command.id()), Some(command));
+        }
+        assert_eq!(MenuCommand::from_id(0), None);
+        assert_eq!(MenuCommand::from_id(999), None);
+        assert_eq!(MenuCommand::Preset(0).id(), 1000);
+    }
+
+    #[test]
+    fn menu_describes_the_live_state() {
+        let presets = vec!["Flat".to_string(), "Bass".to_string()];
+        let visible = menu_tree(&state(&presets, true, true, "Bass"));
+        assert_eq!(
+            labels(&visible),
+            vec![
+                "Hide PeaceControl",
+                "Equalizer enabled",
+                "---",
+                "Configurations",
+                "---",
+                "Settings…",
+                "Exit"
+            ]
+        );
+        match &visible[0] {
+            MenuNode::Item { command, .. } => {
+                assert_eq!(*command, Some(MenuCommand::ToggleWindow))
+            }
+            other => panic!("unexpected first node: {other:?}"),
+        }
+        match &visible[1] {
+            MenuNode::Item { checked, .. } => assert!(*checked),
+            other => panic!("unexpected toggle node: {other:?}"),
+        }
+        let hidden = menu_tree(&state(&presets, false, false, "Flat"));
+        match &hidden[0] {
+            MenuNode::Item { label, .. } => assert_eq!(label, "Show PeaceControl"),
+            other => panic!("unexpected first node: {other:?}"),
+        }
+        match &hidden[1] {
+            MenuNode::Item { checked, .. } => assert!(!checked),
+            other => panic!("unexpected toggle node: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn configurations_submenu_checks_the_active_one() {
+        let presets = vec!["Flat".to_string(), "Bass".to_string(), "Vocal".to_string()];
+        let tree = menu_tree(&state(&presets, true, true, "Bass"));
+        let submenu = tree
+            .iter()
+            .find_map(|node| match node {
+                MenuNode::Submenu { items, .. } => Some(items),
+                _ => None,
+            })
+            .expect("configurations submenu");
+        assert_eq!(submenu.len(), 3);
+        let checked: Vec<String> = submenu
+            .iter()
+            .filter_map(|node| match node {
+                MenuNode::Item {
+                    label,
+                    command,
+                    checked,
+                    ..
+                } if *checked => Some(format!("{label}:{}", command.unwrap().id())),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(checked, vec!["Bass:1001".to_string()]);
+    }
+
+    #[test]
+    fn an_empty_library_shows_a_disabled_placeholder() {
+        let tree = menu_tree(&state(&[], true, true, ""));
+        assert!(tree.iter().any(|node| matches!(
+            node,
+            MenuNode::Item {
+                label,
+                command: None,
+                enabled: false,
+                ..
+            } if label == "No configurations"
+        )));
+    }
+
+    #[test]
+    fn commands_map_to_events_including_presets() {
+        let presets = vec!["A".to_string(), "B".to_string()];
+        assert_eq!(
+            event_for_command(MenuCommand::ToggleWindow, &presets),
+            Some(ShellEvent::ToggleWindow)
+        );
+        assert_eq!(
+            event_for_command(MenuCommand::ToggleEnabled, &presets),
+            Some(ShellEvent::ToggleEnabled)
+        );
+        assert_eq!(
+            event_for_command(MenuCommand::OpenSettings, &presets),
+            Some(ShellEvent::OpenSettings)
+        );
+        assert_eq!(
+            event_for_command(MenuCommand::Exit, &presets),
+            Some(ShellEvent::Exit)
+        );
+        assert_eq!(
+            event_for_command(MenuCommand::Preset(1), &presets),
+            Some(ShellEvent::ActivatePreset("B".to_string()))
+        );
+        assert_eq!(event_for_command(MenuCommand::Preset(9), &presets), None);
+    }
+
+    #[test]
     fn foreground_lookup_never_panics() {
         let _ = foreground_process();
     }
 
     #[cfg(windows)]
     #[test]
-    fn shell_registers_and_releases_a_global_hotkey() {
+    fn posted_menu_commands_arrive_through_the_window_procedure() {
         // Without an interactive desktop the tray cannot be created; the test
         // then has nothing to prove and simply returns.
         let Some(mut shell) = Shell::new("PeaceControl test") else {
             return;
         };
-        let problems = shell.register(&[("Ctrl+Alt+Shift+F24".to_string(), HotkeyAction::Toggle)]);
-        assert!(problems.is_empty(), "{problems:?}");
-        let presets = vec!["Test".to_string()];
-        let state = MenuState {
-            presets: &presets,
-            enabled: true,
-            visible: true,
-            preset_playing: "Test",
-        };
-        assert!(shell.poll(&state).is_empty());
-        shell.clear_hotkeys();
-        let problems = shell.register(&[("not a hotkey".to_string(), HotkeyAction::Next)]);
-        assert_eq!(problems.len(), 1);
+        let presets = vec!["First".to_string(), "Second".to_string()];
+        let menu_state = state(&presets, true, true, "First");
+
+        // Nothing is queued yet.
+        assert!(shell.poll(&menu_state).is_empty());
+
+        let expectations = [
+            (MenuCommand::ToggleWindow, ShellEvent::ToggleWindow),
+            (MenuCommand::ToggleEnabled, ShellEvent::ToggleEnabled),
+            (MenuCommand::OpenSettings, ShellEvent::OpenSettings),
+            (MenuCommand::Exit, ShellEvent::Exit),
+            (
+                MenuCommand::Preset(1),
+                ShellEvent::ActivatePreset("Second".to_string()),
+            ),
+        ];
+        for (command, expected) in expectations {
+            shell.post_command(command);
+            // The message is queued; poll dispatches it through the real
+            // window procedure before decoding the event.
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            let events = shell.poll(&menu_state);
+            assert_eq!(events, vec![expected], "command {command:?}");
+        }
+
+        // The configurations submenu offered by the menu is the list that the
+        // identifiers point into, so an index past the end is dropped, not
+        // mapped to another configuration.
+        shell.post_command(MenuCommand::Preset(30));
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        assert!(shell.poll(&menu_state).is_empty());
     }
 }

@@ -132,7 +132,17 @@ The workspace has 152 unit and integration tests (no network, no GUI):
 - hotkeys: modifier and key parsing, rejection of unsafe combinations, name
   round trips, and the filter that skips empty bindings;
 - the tray self test registers a real global hotkey through `RegisterHotKey` and
-  releases it again (it reports nothing to do when no desktop session exists).
+  releases it again (it reports nothing to do when no desktop session exists);
+- the tray menu: every label, identifier, check mark and submenu entry, the
+  identifier round trip, and the mapping of a posted `WM_COMMAND` to the event a
+  click produces;
+- preset cycling, including wrap-around and a deleted active configuration.
+
+`scripts/verify-tray.ps1` complements those unit tests with an end-to-end run
+against a real build: it posts the `WM_COMMAND` messages the menu items carry to
+the tray window, then asserts the window position and extended style,
+`settings.json`, the applied configuration, the log, and that a restart keeps
+the menu's changes.
 
 GUI rendering is not unit tested; it was smoke tested by starting the binary and
 confirming it creates its data folders, seeds the library and stays running.
