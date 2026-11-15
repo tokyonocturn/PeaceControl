@@ -4,6 +4,17 @@ All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-11-15
+
+No functional change: the application behaves exactly as 1.2.0. This release
+exists so the shipped tag has a green test run.
+
+### Fixed
+
+- The command line tests shared one temporary fixture path, so tests running in
+  parallel could read a file another had just truncated and fail. Every fixture
+  now gets its own file.
+
 ## [1.2.0] - 2026-11-15
 
 Makes the tray menu work through the same path Windows uses, keeps it available

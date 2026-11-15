@@ -6,7 +6,7 @@
 # step is skipped and only the portable package is produced.
 
 param(
-    [string]$Version = "1.2.0",
+    [string]$Version = "1.2.1",
     [switch]$SkipTests
 )
 

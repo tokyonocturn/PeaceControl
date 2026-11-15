@@ -320,9 +320,13 @@ mod tests {
     use super::*;
 
     fn temp(name: &str) -> PathBuf {
+        // Tests run in parallel, so every fixture needs its own file; a shared
+        // name let one test read a file another had just truncated.
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let id = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let dir = std::env::temp_dir().join(format!("pc-cli-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
-        dir.join(name)
+        dir.join(format!("{id}-{name}"))
     }
 
     fn write_preset() -> PathBuf {

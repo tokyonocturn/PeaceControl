@@ -54,7 +54,7 @@ Copy-Item target\release\peacecontrol.exe dist\portable\PeaceControl.exe
 Copy-Item target\release\peacecontrol-cli.exe dist\portable\
 New-Item -ItemType File dist\portable\peacecontrol.portable
 Copy-Item README.md, LICENSE dist\portable\
-Compress-Archive -Path dist\portable\* -DestinationPath dist\PeaceControl-1.2.0-portable.zip -Force
+Compress-Archive -Path dist\portable\* -DestinationPath dist\PeaceControl-1.2.1-portable.zip -Force
 ```
 
 With `peacecontrol.portable` beside the executable, settings, presets, logs and
@@ -71,7 +71,7 @@ everything again on uninstall.
 & "C:\Program Files (x86)\NSIS\makensis.exe" /DAPP_VERSION=1.0.0 installer\PeaceControl.nsi
 ```
 
-Output: `dist\PeaceControl-Setup-1.2.0.exe`.
+Output: `dist\PeaceControl-Setup-1.2.1.exe`.
 
 The uninstaller (`uninstall.exe`, written into the install folder) removes
 program files, shortcuts and registry entries. It asks before deleting
