@@ -1,0 +1,16 @@
+/target
+**/*.rs.bk
+
+# Local reverse-engineering scratch space (the original binary is not distributed)
+/analysis/
+
+# Packaged output
+/dist/
+/installer/output/
+
+# Editor / OS noise
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
