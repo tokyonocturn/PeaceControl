@@ -10,7 +10,9 @@ mod dialogs;
 mod engine;
 mod graph;
 mod platform;
+mod shell;
 mod theme;
+mod tray;
 mod widgets;
 
 use peace_control_core::logging;
@@ -62,6 +64,14 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "PeaceControl",
         options,
-        Box::new(move |cc| Ok(Box::new(app::PeaceApp::new(cc, paths, settings)))),
+        Box::new(move |cc| {
+            let start_hidden = std::env::args().any(|arg| arg == "--minimized");
+            Ok(Box::new(app::PeaceApp::new(
+                cc,
+                paths,
+                settings,
+                start_hidden,
+            )))
+        }),
     )
 }

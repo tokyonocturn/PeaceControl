@@ -81,11 +81,16 @@ impl Engine {
         self.target.is_some()
     }
 
-    /// Writes the rendered preset to the selected target file.
-    pub fn apply(&self, preset: &Preset) -> Result<PathBuf> {
+    /// Writes the preset, or an empty configuration when the equalizer is
+    /// bypassed. Equalizer APO reads an empty file as "change nothing", which is
+    /// exactly what the global enable switch has to do.
+    pub fn apply_state(&self, preset: &Preset, enabled: bool) -> Result<PathBuf> {
         let target = self.target.clone().ok_or(Error::NoTargetSelected)?;
-        let options = RenderOptions::from_preset(preset);
-        let text = render::render_config(preset, &options);
+        let text = if enabled {
+            render::render_config(preset, &RenderOptions::from_preset(preset))
+        } else {
+            String::new()
+        };
         fsutil::write_atomic(&target, &text)?;
         log::info!(
             "applied preset '{}' to {} ({} bytes)",
@@ -201,7 +206,7 @@ mod tests {
     fn apply_without_target_fails_cleanly() {
         let paths = AppPaths::with_root(std::env::temp_dir().join("pc-engine-apply"));
         let engine = Engine::new(paths);
-        let error = engine.apply(&Preset::default()).unwrap_err();
+        let error = engine.apply_state(&Preset::default(), true).unwrap_err();
         assert!(matches!(error, Error::NoTargetSelected));
     }
 
@@ -225,11 +230,33 @@ mod tests {
         let mut preset = Preset::default();
         preset.preamp_db = -3.0;
         preset.speakers[0].bands[0].gain_db = 6.0;
-        let written = engine.apply(&preset).unwrap();
+        let written = engine.apply_state(&preset, true).unwrap();
         assert_eq!(written, target);
         let text = std::fs::read_to_string(&target).unwrap();
         assert!(text.contains("Preamp: -3 dB"));
         assert!(text.contains("Filter: ON PK"));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn bypassing_writes_an_empty_configuration() {
+        let dir = std::env::temp_dir().join(format!("pc-engine-bypass-{}", std::process::id()));
+        let config_dir = dir.join("config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        let target = config_dir.join("config.txt");
+        std::fs::write(
+            &target,
+            "Preamp: -6 dB
+",
+        )
+        .unwrap();
+
+        let mut engine = Engine::new(AppPaths::with_root(dir.join("data")));
+        engine.target = Some(target.clone());
+        engine.apply_state(&Preset::default(), false).unwrap();
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "");
+        engine.apply_state(&Preset::default(), true).unwrap();
+        assert!(!std::fs::read_to_string(&target).unwrap().is_empty());
         let _ = std::fs::remove_dir_all(dir);
     }
 

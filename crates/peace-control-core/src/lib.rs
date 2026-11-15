@@ -17,16 +17,20 @@
 //! * [`logging`] – file logger
 //! * [`session`] – crash recovery drafts
 //! * [`dsp`] – predicted frequency response
+//! * [`automation`] – per application profile rules
+//! * [`hotkeys`] – global hotkey descriptions
 
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::field_reassign_with_default))]
 
 pub mod audacity;
 pub mod autoeq;
+pub mod automation;
 pub mod backup;
 pub mod dsp;
 pub mod error;
 pub mod fsutil;
+pub mod hotkeys;
 pub mod library;
 pub mod logging;
 pub mod model;
@@ -38,6 +42,7 @@ pub mod render;
 pub mod session;
 pub mod settings;
 
+pub use automation::AppRule;
 pub use error::{Error, Result};
 pub use model::{Band, Effects, FilterType, Preset, SpeakerEq};
 pub use settings::Settings;

@@ -73,6 +73,7 @@ pub struct Windows {
     pub recovery: bool,
     pub help: bool,
     pub confirm_close: bool,
+    pub apps: bool,
 }
 
 /// Nested action, applied after the interface closure finished borrowing.
@@ -112,10 +113,22 @@ pub struct PeaceApp {
     pub(crate) commands_buffer: String,
     pub(crate) last_edit: Instant,
     pub(crate) allow_close: bool,
+    pub(crate) shell: Option<crate::tray::Shell>,
+    pub(crate) shell_problems: Vec<String>,
+    pub(crate) window_visible: bool,
+    pub(crate) start_hidden: bool,
+    pub(crate) automation: peace_control_core::automation::Tracker,
+    pub(crate) last_automation_poll: Instant,
+    pub(crate) tooltip_cache: String,
 }
 
 impl PeaceApp {
-    pub fn new(cc: &eframe::CreationContext<'_>, paths: AppPaths, settings: Settings) -> Self {
+    pub fn new(
+        cc: &eframe::CreationContext<'_>,
+        paths: AppPaths,
+        settings: Settings,
+        start_hidden: bool,
+    ) -> Self {
         theme::install_fonts(&cc.egui_ctx);
         let mut settings = settings;
         settings = settings.sanitized();
@@ -177,7 +190,15 @@ impl PeaceApp {
             commands_buffer: String::new(),
             last_edit: Instant::now(),
             allow_close: false,
+            shell: None,
+            shell_problems: Vec::new(),
+            window_visible: true,
+            start_hidden,
+            automation: peace_control_core::automation::Tracker::default(),
+            last_automation_poll: Instant::now(),
+            tooltip_cache: String::new(),
         };
+        app.init_shell(&cc.egui_ctx);
         app.windows.recovery = has_draft;
         app.refresh_files();
         app.show_preamp = app.settings.preamp_in_graph;
@@ -363,7 +384,7 @@ impl PeaceApp {
         if self.preset.effects.graphic_eq {
             log::info!("applying Graphic EQ mode");
         }
-        match self.engine.apply(&self.preset) {
+        match self.engine.apply_state(&self.preset, self.settings.enabled) {
             Ok(path) => {
                 self.applied_at = Some(Instant::now());
                 self.status(
@@ -716,14 +737,28 @@ fn next_copy(name: &str) -> String {
 
 impl eframe::App for PeaceApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        // Ask before losing unsaved work when the window close button is used.
-        if ctx.input(|input| input.viewport().close_requested())
-            && !self.allow_close
-            && self.dirty
-            && self.settings.confirm_on_exit
+        // Closing can keep running in the tray instead of quitting.
+        if ctx.input(|input| input.viewport().close_requested()) && !self.allow_close {
+            if self.settings.close_to_tray {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                self.set_window_visible(ctx, false);
+                self.status("Still running in the tray", StatusKind::Info);
+            } else if self.dirty && self.settings.confirm_on_exit {
+                // Ask before losing unsaved work.
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                self.windows.confirm_close = true;
+            }
+        }
+
+        self.poll_shell(ctx);
+        self.poll_automation(ctx);
+
+        // Hiding instead of minimising keeps the taskbar clean.
+        if self.settings.minimize_to_tray
+            && self.window_visible
+            && ctx.input(|input| input.viewport().minimized == Some(true))
         {
-            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            self.windows.confirm_close = true;
+            self.set_window_visible(ctx, false);
         }
 
         let shortcuts = ctx.input(|input| ShortcutState {
@@ -805,6 +840,7 @@ impl eframe::App for PeaceApp {
         self.toast(ctx);
 
         if self.settings.apply_automatically
+            && self.settings.enabled
             && self.dirty
             && self.last_edit.elapsed().as_millis() > 500
             && self.applied_at.is_some()
@@ -813,7 +849,7 @@ impl eframe::App for PeaceApp {
             // Only rewrite while the pointer is up, so dragging never hammers
             // the audio engine with intermediate files.
             if !ctx.input(|input| input.pointer.primary_down()) {
-                if let Ok(path) = self.engine.apply(&self.preset) {
+                if let Ok(path) = self.engine.apply_state(&self.preset, self.settings.enabled) {
                     log::debug!("live apply to {}", path.display());
                     self.applied_at = Some(Instant::now());
                     self.last_edit = Instant::now() + std::time::Duration::from_secs(60);
@@ -825,6 +861,7 @@ impl eframe::App for PeaceApp {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.release_shell();
         self.settings.window_width = self.last_size.x;
         self.settings.window_height = self.last_size.y;
         let _ = self.settings.save(&self.paths.settings_file());
@@ -898,9 +935,26 @@ impl PeaceApp {
                     });
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let enabled = self.engine.ready();
-                        if widgets::primary_button(ui, "Apply", enabled, &palette).clicked() {
+                        let ready = self.engine.ready();
+                        if widgets::primary_button(ui, "Apply", ready, &palette).clicked() {
                             self.apply_now();
+                        }
+                        let eq_on = self.settings.enabled;
+                        if widgets::ghost_button(
+                            ui,
+                            if eq_on { "EQ on" } else { "EQ bypassed" },
+                            &palette,
+                        )
+                        .on_hover_text("Enable or bypass the equalizer everywhere")
+                        .clicked()
+                        {
+                            self.set_enabled(!eq_on);
+                        }
+                        if widgets::ghost_button(ui, "Tray", &palette)
+                            .on_hover_text("Hide the window and keep running in the tray")
+                            .clicked()
+                        {
+                            self.set_window_visible(ctx, false);
                         }
                         if widgets::ghost_button(ui, "Save", &palette).clicked() {
                             self.save_preset();
@@ -1221,6 +1275,12 @@ impl PeaceApp {
                             .clicked()
                         {
                             self.open_commands();
+                        }
+                        if widgets::ghost_button(ui, "Apps", &palette)
+                            .on_hover_text("Switch configurations per application")
+                            .clicked()
+                        {
+                            self.windows.apps = true;
                         }
                         let active = self.preset.effects.active_count();
                         if active > 0 {

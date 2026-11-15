@@ -19,6 +19,7 @@ pub fn show_all(app: &mut PeaceApp, ctx: &egui::Context) {
     help(app, ctx);
     recovery(app, ctx);
     confirm_close(app, ctx);
+    applications(app, ctx);
 }
 
 fn window_frame(palette: &theme::Palette) -> egui::Frame {
@@ -618,6 +619,76 @@ fn settings(app: &mut PeaceApp, ctx: &egui::Context) {
                         &mut app.settings.confirm_on_exit,
                         &palette,
                     );
+                    settings_changed |= widgets::toggle_row(
+                        ui,
+                        "Close to tray",
+                        "Keep running in the tray when the window is closed.",
+                        &mut app.settings.close_to_tray,
+                        &palette,
+                    );
+                    settings_changed |= widgets::toggle_row(
+                        ui,
+                        "Minimize to tray",
+                        "Hide the window instead of minimising it to the taskbar.",
+                        &mut app.settings.minimize_to_tray,
+                        &palette,
+                    );
+                    settings_changed |= widgets::toggle_row(
+                        ui,
+                        "Switch per application",
+                        "Activate the configuration mapped to the foreground program.",
+                        &mut app.settings.automate_apps,
+                        &palette,
+                    );
+                    if widgets::ghost_button(ui, "Edit application rules...", &palette).clicked() {
+                        app.windows.apps = true;
+                    }
+
+                    ui.add_space(10.0);
+                    ui.separator();
+                    widgets::section_title(ui, "Global hotkeys", &palette);
+                    let mut hotkeys_changed = false;
+                    hotkeys_changed |= hotkey_row(
+                        ui,
+                        "Toggle equalizer",
+                        &mut app.settings.hotkey_toggle,
+                        &palette,
+                    );
+                    hotkeys_changed |= hotkey_row(
+                        ui,
+                        "Next configuration",
+                        &mut app.settings.hotkey_next,
+                        &palette,
+                    );
+                    hotkeys_changed |= hotkey_row(
+                        ui,
+                        "Previous configuration",
+                        &mut app.settings.hotkey_previous,
+                        &palette,
+                    );
+                    if hotkeys_changed {
+                        app.reload_hotkeys();
+                        settings_changed = true;
+                    }
+                    if app.shell.is_none() {
+                        ui.label(
+                            RichText::new(
+                                "The tray icon and hotkeys are unavailable in this session.",
+                            )
+                            .size(9.5)
+                            .color(palette.warn),
+                        );
+                    }
+                    for problem in &app.shell_problems {
+                        ui.label(RichText::new(problem).size(9.5).color(palette.warn));
+                    }
+                    ui.label(
+                        RichText::new(
+                            "Hotkeys work while any program is focused. Leave a field empty to disable it.",
+                        )
+                        .size(9.5)
+                        .color(palette.muted),
+                    );
                     ui.horizontal(|ui| {
                         ui.label(RichText::new("Log level").size(11.5).color(palette.muted));
                         egui::ComboBox::from_id_salt("log-level")
@@ -1075,6 +1146,195 @@ fn help(app: &mut PeaceApp, ctx: &egui::Context) {
             });
         });
     app.windows.help = open;
+}
+
+fn hotkey_row(
+    ui: &mut egui::Ui,
+    label: &str,
+    value: &mut String,
+    palette: &theme::Palette,
+) -> bool {
+    let mut changed = false;
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(label).size(11.5).color(palette.muted));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let valid = value.trim().is_empty()
+                || peace_control_core::hotkeys::Hotkey::parse(value).is_some();
+            ui.label(
+                RichText::new(if valid { "ready" } else { "invalid" })
+                    .size(9.5)
+                    .color(if valid { palette.ok } else { palette.warn }),
+            );
+            if ui
+                .add(
+                    egui::TextEdit::singleline(value)
+                        .desired_width(150.0)
+                        .hint_text("Ctrl+Alt+P"),
+                )
+                .changed()
+            {
+                changed = true;
+            }
+        });
+    });
+    changed
+}
+
+fn applications(app: &mut PeaceApp, ctx: &egui::Context) {
+    if !app.windows.apps {
+        return;
+    }
+    let mut open = true;
+    let palette = app.palette;
+    let names: Vec<String> = app
+        .preset_files
+        .iter()
+        .map(|entry| entry.name.clone())
+        .collect();
+    let foreground = crate::tray::foreground_process();
+    let mut changed = false;
+    let mut remove: Option<usize> = None;
+
+    egui::Window::new("Applications")
+        .id(egui::Id::new("applications-window"))
+        .open(&mut open)
+        .default_width(600.0)
+        .resizable(true)
+        .frame(window_frame(&palette))
+        .show(ctx, |ui| {
+            header(
+                ui,
+                "Per-application configurations",
+                "When a matching program is in front, its configuration is activated and applied.",
+                &palette,
+            );
+
+            changed |= widgets::toggle_row(
+                ui,
+                "Automation enabled",
+                "Watch the foreground program while PeaceControl runs.",
+                &mut app.settings.automate_apps,
+                &palette,
+            );
+
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.label(
+                    RichText::new(format!(
+                        "Foreground now: {}",
+                        foreground.clone().unwrap_or_else(|| "unknown".to_string())
+                    ))
+                    .size(10.0)
+                    .monospace()
+                    .color(palette.muted),
+                );
+                if widgets::ghost_button(ui, "Add current application", &palette).clicked() {
+                    app.add_rule_for_foreground();
+                    changed = true;
+                }
+            });
+            if let Some(active) = app.tracker_active() {
+                ui.label(
+                    RichText::new(format!("Automation is holding \u{201c}{active}\u{201d}"))
+                        .size(9.5)
+                        .color(palette.muted),
+                );
+            }
+
+            ui.add_space(8.0);
+            ui.separator();
+            widgets::section_title(ui, "Rules", &palette);
+            ui.label(
+                RichText::new("First match wins. Process names ignore case and the .exe suffix.")
+                    .size(9.5)
+                    .color(palette.muted),
+            );
+            ui.add_space(4.0);
+
+            if app.settings.app_rules.is_empty() {
+                ui.label(
+                    RichText::new("No rules yet. Add the program you are using, or add one below.")
+                        .size(11.0)
+                        .color(palette.muted),
+                );
+            }
+
+            egui::ScrollArea::vertical()
+                .id_salt("app-rules")
+                .max_height(260.0)
+                .show(ui, |ui| {
+                    for (index, rule) in app.settings.app_rules.iter_mut().enumerate() {
+                        ui.horizontal(|ui| {
+                            if ui
+                                .add(
+                                    egui::TextEdit::singleline(&mut rule.process)
+                                        .desired_width(200.0)
+                                        .hint_text("game.exe"),
+                                )
+                                .changed()
+                            {
+                                changed = true;
+                            }
+                            ui.label(RichText::new("\u{2192}").size(11.0).color(palette.muted));
+                            egui::ComboBox::from_id_salt(("rule-preset", index))
+                                .selected_text(if rule.preset.is_empty() {
+                                    "choose".to_string()
+                                } else {
+                                    rule.preset.clone()
+                                })
+                                .width(200.0)
+                                .show_ui(ui, |ui| {
+                                    for name in &names {
+                                        if ui.selectable_label(rule.preset == *name, name).clicked()
+                                        {
+                                            rule.preset = name.clone();
+                                            changed = true;
+                                        }
+                                    }
+                                });
+                            if ui.small_button("remove").clicked() {
+                                remove = Some(index);
+                            }
+                        });
+                    }
+                });
+
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if widgets::primary_button(ui, "Add rule", true, &palette).clicked() {
+                    let preset = names.first().cloned().unwrap_or_default();
+                    app.settings
+                        .app_rules
+                        .push(peace_control_core::AppRule::new("", preset));
+                    changed = true;
+                }
+                if widgets::ghost_button(ui, "Clear rules", &palette).clicked() {
+                    app.settings.app_rules.clear();
+                    changed = true;
+                }
+                if widgets::ghost_button(ui, "Close", &palette).clicked() {
+                    app.windows.apps = false;
+                }
+            });
+            ui.add_space(4.0);
+            ui.label(
+                RichText::new(
+                    "Switching saves the configuration you were editing first, so no work is lost.",
+                )
+                .size(9.5)
+                .color(palette.muted),
+            );
+        });
+
+    if let Some(index) = remove {
+        app.settings.app_rules.remove(index);
+        changed = true;
+    }
+    if changed {
+        app.save_settings();
+        app.reset_automation();
+    }
+    app.windows.apps = open;
 }
 
 fn confirm_close(app: &mut PeaceApp, ctx: &egui::Context) {

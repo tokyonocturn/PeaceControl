@@ -1,5 +1,6 @@
 //! Application settings, stored as readable JSON.
 
+use crate::automation::{normalize_process, AppRule};
 use crate::error::Result;
 use crate::fsutil;
 use crate::paths::AppPaths;
@@ -59,6 +60,22 @@ pub struct Settings {
     pub last_preset: Option<String>,
     pub recent_presets: Vec<String>,
     pub log_level: String,
+    /// Global equalizer state. When off, the target file is left empty.
+    pub enabled: bool,
+    /// Hide the window in the tray instead of minimising to the taskbar.
+    pub minimize_to_tray: bool,
+    /// Keep running in the tray when the window is closed.
+    pub close_to_tray: bool,
+    /// Global hotkey that toggles the equalizer.
+    pub hotkey_toggle: String,
+    /// Global hotkey that activates the next configuration.
+    pub hotkey_next: String,
+    /// Global hotkey that activates the previous configuration.
+    pub hotkey_previous: String,
+    /// Watch the foreground application and switch configurations.
+    pub automate_apps: bool,
+    /// Rules used by the automation above, first match wins.
+    pub app_rules: Vec<AppRule>,
 }
 
 impl Default for Settings {
@@ -82,6 +99,14 @@ impl Default for Settings {
             last_preset: None,
             recent_presets: Vec::new(),
             log_level: "info".to_string(),
+            enabled: true,
+            minimize_to_tray: false,
+            close_to_tray: false,
+            hotkey_toggle: "Ctrl+Alt+P".to_string(),
+            hotkey_next: "Ctrl+Alt+Right".to_string(),
+            hotkey_previous: "Ctrl+Alt+Left".to_string(),
+            automate_apps: false,
+            app_rules: Vec::new(),
         }
     }
 }
@@ -102,6 +127,26 @@ impl Settings {
             }
             _ => "info".to_string(),
         };
+        settings.hotkey_toggle = settings.hotkey_toggle.trim().to_string();
+        settings.hotkey_next = settings.hotkey_next.trim().to_string();
+        settings.hotkey_previous = settings.hotkey_previous.trim().to_string();
+        settings.app_rules = settings
+            .app_rules
+            .iter()
+            .map(|rule| AppRule::new(rule.process.trim(), rule.preset.trim()))
+            .filter(|rule| !rule.process.is_empty() && !rule.preset.is_empty())
+            .take(64)
+            .collect();
+        let mut seen: Vec<String> = Vec::new();
+        settings.app_rules.retain(|rule| {
+            let key = normalize_process(&rule.process);
+            if key.is_empty() || seen.contains(&key) {
+                false
+            } else {
+                seen.push(key);
+                true
+            }
+        });
         settings
     }
 
@@ -205,6 +250,29 @@ mod tests {
         assert_eq!(sanitized.default_band_count, 1);
         assert_eq!(sanitized.recent_presets.len(), 12);
         assert_eq!(sanitized.log_level, "info");
+    }
+
+    #[test]
+    fn automation_rules_are_trimmed_deduplicated_and_capped() {
+        let mut settings = Settings::default();
+        settings.app_rules = vec![
+            AppRule::new("  chrome.exe ", " Headphones "),
+            AppRule::new("CHROME", "Other"),
+            AppRule::new("", "Orphan"),
+            AppRule::new("spotify", ""),
+        ];
+        let sanitized = settings.sanitized();
+        assert_eq!(sanitized.app_rules.len(), 1);
+        assert_eq!(sanitized.app_rules[0].process, "chrome.exe");
+        assert_eq!(sanitized.app_rules[0].preset, "Headphones");
+    }
+
+    #[test]
+    fn automation_is_off_by_default_and_hotkeys_are_set() {
+        let settings = Settings::default();
+        assert!(settings.enabled);
+        assert!(!settings.automate_apps);
+        assert_eq!(settings.hotkey_toggle, "Ctrl+Alt+P");
     }
 
     #[test]
