@@ -4,6 +4,34 @@ All notable changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-11-15
+
+Makes the interface itself the evidence that tray commands work, and shows the
+state those commands change inside Settings.
+
+### Added
+
+- Settings now starts with a **Status** section that shows the equalizer state,
+  the active configuration and when the configuration was last applied, so a
+  tray toggle or configuration switch is visible there immediately.
+- One view model (`view::UiState`) produces the header button label, the status
+  bar's applied line and the Settings status texts, and writes the same values
+  to the file named by `PEACECONTROL_UI_DUMP` when that variable is set. The
+  verification script reads that snapshot, so what it asserts is what the
+  widgets rendered.
+- Unit tests for the view model: enabling, bypassing and activating a
+  configuration change the header and settings labels; the settings panel flag
+  and window state are reported; the snapshot key ignores the ticking seconds.
+- `scripts/verify-tray.ps1` now also asserts the UI snapshot after every posted
+  command and captures two screenshots of the real window (equalizer bypassed,
+  settings panel open) into `dist\verification`; the 1.2.2 captures
+  are kept in `docs\verification`.
+
+### Changed
+
+- The status bar always shows the applied line, including "not applied yet", so
+  the state is readable before the first write.
+
 ## [1.2.1] - 2026-11-15
 
 No functional change: the application behaves exactly as 1.2.0. This release

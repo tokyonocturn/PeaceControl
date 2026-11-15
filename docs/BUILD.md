@@ -22,7 +22,7 @@ registry and native file dialogs.
 ## Build and test
 
 ```powershell
-cargo test --workspace        # 158 tests
+cargo test --workspace        # 162 tests
 cargo build                   # debug binaries in target\debug
 cargo build --release         # release binaries in target\release
 ```
@@ -54,7 +54,7 @@ Copy-Item target\release\peacecontrol.exe dist\portable\PeaceControl.exe
 Copy-Item target\release\peacecontrol-cli.exe dist\portable\
 New-Item -ItemType File dist\portable\peacecontrol.portable
 Copy-Item README.md, LICENSE dist\portable\
-Compress-Archive -Path dist\portable\* -DestinationPath dist\PeaceControl-1.2.1-portable.zip -Force
+Compress-Archive -Path dist\portable\* -DestinationPath dist\PeaceControl-1.2.2-portable.zip -Force
 ```
 
 With `peacecontrol.portable` beside the executable, settings, presets, logs and
@@ -71,7 +71,7 @@ everything again on uninstall.
 & "C:\Program Files (x86)\NSIS\makensis.exe" /DAPP_VERSION=1.0.0 installer\PeaceControl.nsi
 ```
 
-Output: `dist\PeaceControl-Setup-1.2.1.exe`.
+Output: `dist\PeaceControl-Setup-1.2.2.exe`.
 
 The uninstaller (`uninstall.exe`, written into the install folder) removes
 program files, shortcuts and registry entries. It asks before deleting
@@ -106,14 +106,29 @@ temporary folder, drives the tray menu the way Explorer does (posting the
 `WM_COMMAND` message each item carries to the `PeaceControlShellWindow` window)
 and asserts the real result of every command: the window is parked off-screen
 and restored, the equalizer state and the applied configuration change, the
-chosen configuration is persisted, the settings window opens, close and minimise
-to tray keep the process alive, and a restart keeps the menu's changes. It exits
-non-zero on the first failed check and leaves its temporary data behind for
-inspection.
+chosen configuration is persisted, the settings panel opens, close and minimise
+to tray keep the process alive, and a restart keeps the menu's changes.
+
+It also checks what the running interface shows, not just files and logs. The
+application writes the values the header, status bar and settings panel render to
+the file named by `PEACECONTROL_UI_DUMP` (only when that variable is set, and
+only when the state changes), and the script asserts the header EQ label, the
+active configuration, the applied line and the settings panel flag after each
+posted command. Two screenshots of the real window - one with the equalizer
+bypassed and one with the settings panel open - are written to
+`dist\verification`, and the capture is rejected when it comes back blank. The
+script exits non-zero on the first failed check and leaves its temporary data
+behind for inspection.
+
+The two captures from the 1.2.2 run are kept in this repository:
+
+![Header after a posted tray command toggled the equalizer off](verification/tray-header-bypassed.png)
+
+![Settings opened from the tray, showing the active configuration and state](verification/tray-settings.png)
 
 ```powershell
 cargo build --release
-powershell -ExecutionPolicy Bypass -File scriptserify-tray.ps1
+powershell -ExecutionPolicy Bypass -File scripts\erify-tray.ps1
 ```
 
 It needs an interactive desktop session, because a tray icon cannot exist

@@ -464,6 +464,24 @@ fn settings(app: &mut PeaceApp, ctx: &egui::Context) {
             egui::ScrollArea::vertical()
                 .max_height(430.0)
                 .show(ui, |ui| {
+                    widgets::section_title(ui, "Status", &palette);
+                    ui.label(
+                        RichText::new(format!("Equalizer: {}", app.ui.settings_eq_label))
+                            .size(11.0)
+                            .color(palette.text),
+                    );
+                    ui.label(
+                        RichText::new(format!("Active configuration: {}", app.ui.preset))
+                            .size(11.0)
+                            .color(palette.text),
+                    );
+                    ui.label(
+                        RichText::new(format!("Applied: {}", app.ui.applied_label))
+                            .size(10.5)
+                            .color(palette.muted),
+                    );
+                    ui.add_space(10.0);
+                    ui.separator();
                     widgets::section_title(ui, "Equalizer APO", &palette);
                     ui.add_space(4.0);
                     ui.horizontal(|ui| {

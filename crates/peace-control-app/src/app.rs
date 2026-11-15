@@ -116,6 +116,7 @@ pub struct PeaceApp {
     pub(crate) shell: Option<crate::tray::Shell>,
     pub(crate) shell_problems: Vec<String>,
     pub(crate) window_visible: bool,
+    pub(crate) ui: crate::view::UiState,
     pub(crate) start_hidden: bool,
     pub(crate) automation: peace_control_core::automation::Tracker,
     pub(crate) last_automation_poll: Instant,
@@ -160,6 +161,9 @@ impl PeaceApp {
             .map(|draft| draft.preset != preset && draft.age_seconds() < 60 * 60 * 24 * 14)
             .unwrap_or(false);
 
+        let ui =
+            crate::view::UiState::new(&settings, &preset, engine.status_text(), None, false, true);
+
         let mut app = PeaceApp {
             paths,
             settings,
@@ -197,6 +201,7 @@ impl PeaceApp {
             automation: peace_control_core::automation::Tracker::default(),
             last_automation_poll: Instant::now(),
             tooltip_cache: String::new(),
+            ui,
         };
         app.init_shell(&cc.egui_ctx);
         app.windows.recovery = has_draft;
@@ -701,6 +706,18 @@ impl PeaceApp {
         self.dirty = true;
     }
 
+    /// The text the header, the status bar and Settings currently show.
+    fn ui_state(&self) -> crate::view::UiState {
+        crate::view::UiState::new(
+            &self.settings,
+            &self.preset,
+            self.engine.status_text(),
+            self.applied_at,
+            self.windows.settings,
+            self.window_visible,
+        )
+    }
+
     /// Opens the raw commands window with a fresh editing buffer.
     pub(crate) fn open_commands(&mut self) {
         self.commands_buffer = self.preset.commands.join("\n");
@@ -802,6 +819,11 @@ impl eframe::App for PeaceApp {
 
         self.last_size = ctx.screen_rect().size();
         self.autosave_draft();
+
+        // One snapshot feeds the header, the status bar and the settings
+        // status section, and is what the verification script reads.
+        self.ui = self.ui_state();
+        crate::view::dump_if_requested(&self.ui);
 
         self.top_bar(ctx);
         dialogs::show_all(self, ctx);
@@ -947,13 +969,10 @@ impl PeaceApp {
                             self.apply_now();
                         }
                         let eq_on = self.settings.enabled;
-                        if widgets::ghost_button(
-                            ui,
-                            if eq_on { "EQ on" } else { "EQ bypassed" },
-                            &palette,
-                        )
-                        .on_hover_text("Enable or bypass the equalizer everywhere")
-                        .clicked()
+                        let eq_label = self.ui.eq_label.clone();
+                        if widgets::ghost_button(ui, &eq_label, &palette)
+                            .on_hover_text("Enable or bypass the equalizer everywhere")
+                            .clicked()
                         {
                             self.set_enabled(!eq_on);
                         }
@@ -1812,14 +1831,11 @@ impl PeaceApp {
                         platform::reveal(dir);
                     }
                 }
-                if let Some(applied) = self.applied_at {
-                    let seconds = applied.elapsed().as_secs();
-                    ui.label(
-                        RichText::new(format!("applied {seconds}s ago"))
-                            .size(10.0)
-                            .color(palette.muted),
-                    );
-                }
+                ui.label(
+                    RichText::new(self.ui.applied_label.clone())
+                        .size(10.0)
+                        .color(palette.muted),
+                );
             });
         });
     }

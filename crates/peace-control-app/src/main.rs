@@ -13,6 +13,7 @@ mod platform;
 mod shell;
 mod theme;
 mod tray;
+mod view;
 mod widgets;
 
 use peace_control_core::logging;

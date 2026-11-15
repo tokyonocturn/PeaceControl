@@ -19,6 +19,12 @@ configuration engine can be tested without a window and reused by the CLI.
 
 ## Crates
 
+The GUI crate also has a `view` module: `UiState` turns the application state
+into the exact labels the header, the status bar and the Settings status section
+render, and can write that snapshot to the file named by `PEACECONTROL_UI_DUMP`.
+Because the widgets and the verification script read the same struct, a test can
+assert what the interface shows without a human looking at it.
+
 ### `peace-control-core`
 
 No UI dependencies, no unsafe code (`#![forbid(unsafe_code)]`).
@@ -136,7 +142,11 @@ The workspace has 152 unit and integration tests (no network, no GUI):
 - the tray menu: every label, identifier, check mark and submenu entry, the
   identifier round trip, and the mapping of a posted `WM_COMMAND` to the event a
   click produces;
-- preset cycling, including wrap-around and a deleted active configuration.
+- preset cycling, including wrap-around and a deleted active configuration;
+- the view model the header and settings panel render: enabling, bypassing and
+  activating a configuration each change the labels, the settings panel flag is
+  reported, and the snapshot key ignores the ticking seconds of the applied
+  line.
 
 `scripts/verify-tray.ps1` complements those unit tests with an end-to-end run
 against a real build: it posts the `WM_COMMAND` messages the menu items carry to
