@@ -6,7 +6,7 @@
 # step is skipped and only the portable package is produced.
 
 param(
-    [string]$Version = "1.0.1",
+    [string]$Version = "1.1.0",
     [switch]$SkipTests
 )
 
@@ -37,8 +37,10 @@ if (-not (Test-Path $exe)) { throw "missing $exe" }
 
 $dist = Join-Path $root "dist"
 $portable = Join-Path $dist "portable"
+# Always package from an empty folder: a previous smoke test may have left a
+# `data` directory behind, and that must never end up inside the download.
+if (Test-Path $portable) { Remove-Item $portable -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $dist, $portable | Out-Null
-Get-ChildItem -Path $portable -File | Remove-Item -Force -ErrorAction SilentlyContinue
 
 Write-Step "Preparing portable package"
 Copy-Item $exe (Join-Path $portable "PeaceControl.exe") -Force
