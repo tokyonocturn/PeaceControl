@@ -72,6 +72,7 @@ pub struct Windows {
     pub backups: bool,
     pub recovery: bool,
     pub help: bool,
+    pub confirm_close: bool,
 }
 
 /// Nested action, applied after the interface closure finished borrowing.
@@ -110,6 +111,7 @@ pub struct PeaceApp {
     pub(crate) export_title: String,
     pub(crate) commands_buffer: String,
     pub(crate) last_edit: Instant,
+    pub(crate) allow_close: bool,
 }
 
 impl PeaceApp {
@@ -174,6 +176,7 @@ impl PeaceApp {
             export_title: "Export".to_string(),
             commands_buffer: String::new(),
             last_edit: Instant::now(),
+            allow_close: false,
         };
         app.windows.recovery = has_draft;
         app.refresh_files();
@@ -713,6 +716,16 @@ fn next_copy(name: &str) -> String {
 
 impl eframe::App for PeaceApp {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        // Ask before losing unsaved work when the window close button is used.
+        if ctx.input(|input| input.viewport().close_requested())
+            && !self.allow_close
+            && self.dirty
+            && self.settings.confirm_on_exit
+        {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.windows.confirm_close = true;
+        }
+
         let shortcuts = ctx.input(|input| ShortcutState {
             save: input.modifiers.command && input.key_pressed(egui::Key::S),
             apply: input.modifiers.command && input.key_pressed(egui::Key::E),
@@ -1330,142 +1343,185 @@ impl PeaceApp {
         let palette = self.palette;
         let speaker_index = self.speaker;
 
-        widgets::section_title(ui, "Selected band", &palette);
+        widgets::section_title(ui, "Preset", &palette);
         ui.add_space(4.0);
-
-        let band_index = self.selected_band;
-        let mut changed = false;
-        let mut reset = false;
-
         egui::Frame::none()
             .fill(palette.panel)
             .stroke(Stroke::new(1.0_f32, palette.border))
             .rounding(theme::CARD_RADIUS)
             .inner_margin(egui::Margin::same(10.0))
             .show(ui, |ui| {
-                match band_index {
-                    Some(index) => {
-                        if let Some(band) = self.preset.speakers[speaker_index].bands.get_mut(index)
-                        {
-                            egui::Grid::new("band-editor")
-                                .num_columns(2)
-                                .spacing([8.0, 6.0])
-                                .show(ui, |ui| {
-                                    ui.label(
-                                        RichText::new("Frequency").size(11.0).color(palette.muted),
-                                    );
-                                    let mut freq = band.freq_hz;
-                                    if ui
-                                        .add(
-                                            egui::DragValue::new(&mut freq)
-                                                .speed(1.0)
-                                                .range(MIN_FREQ_HZ..=MAX_FREQ_HZ)
-                                                .suffix(" Hz")
-                                                .fixed_decimals(0),
-                                        )
-                                        .changed()
-                                    {
-                                        band.freq_hz = freq;
-                                        changed = true;
-                                    }
-                                    ui.end_row();
+                ui.label(RichText::new("Description").size(10.5).color(palette.muted));
+                if ui
+                    .add(
+                        egui::TextEdit::singleline(&mut self.preset.description)
+                            .hint_text("What this configuration is for")
+                            .desired_width(f32::INFINITY),
+                    )
+                    .changed()
+                {
+                    self.dirty = true;
+                    self.last_edit = Instant::now();
+                }
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new("Global preamp")
+                        .size(10.5)
+                        .color(palette.muted),
+                );
+                let mut global = self.preset.preamp_db;
+                if ui
+                    .add(
+                        egui::DragValue::new(&mut global)
+                            .speed(0.1)
+                            .range(-40.0..=12.0)
+                            .suffix(" dB")
+                            .fixed_decimals(1),
+                    )
+                    .changed()
+                {
+                    self.push_history();
+                    self.preset.preamp_db = global;
+                    self.dirty = true;
+                    self.last_edit = Instant::now();
+                }
+                ui.label(
+                    RichText::new("Applied once, before every speaker bank.")
+                        .size(9.5)
+                        .color(palette.muted),
+                );
+            });
+        ui.add_space(10.0);
 
-                                    ui.label(RichText::new("Gain").size(11.0).color(palette.muted));
-                                    if ui
-                                        .add(
-                                            egui::DragValue::new(&mut band.gain_db)
-                                                .speed(0.1)
-                                                .range(-30.0..=30.0)
-                                                .suffix(" dB")
-                                                .fixed_decimals(1),
-                                        )
-                                        .changed()
-                                    {
-                                        changed = true;
-                                    }
-                                    ui.end_row();
+        widgets::section_title(ui, "Selected band", &palette);
+        ui.add_space(4.0);
 
-                                    ui.label(
-                                        RichText::new("Quality").size(11.0).color(palette.muted),
-                                    );
-                                    if ui
-                                        .add(
-                                            egui::DragValue::new(&mut band.q)
-                                                .speed(0.01)
-                                                .range(0.1..=40.0)
-                                                .fixed_decimals(2),
-                                        )
-                                        .changed()
-                                    {
-                                        changed = true;
-                                    }
-                                    ui.end_row();
+        let band_index = self.selected_band;
+        let mut changed = false;
+        let mut reset = false;
+        let mut solo = false;
 
-                                    ui.label(
-                                        RichText::new("Filter").size(11.0).color(palette.muted),
-                                    );
-                                    egui::ComboBox::from_id_salt("filter-type")
-                                        .selected_text(band.filter.label())
-                                        .width(150.0)
-                                        .show_ui(ui, |ui| {
-                                            for filter in FilterType::ALL {
-                                                if ui
-                                                    .selectable_value(
-                                                        &mut band.filter,
-                                                        filter,
-                                                        filter.label(),
-                                                    )
-                                                    .clicked()
-                                                {
-                                                    changed = true;
-                                                }
-                                            }
-                                        });
-                                    ui.end_row();
-
-                                    ui.label(
-                                        RichText::new("Enabled").size(11.0).color(palette.muted),
-                                    );
-                                    if widgets::switch(ui, &mut band.enabled, &palette).clicked() {
-                                        changed = true;
-                                    }
-                                    ui.end_row();
-                                });
-
-                            ui.add_space(4.0);
-                            ui.label(
-                                RichText::new(band.filter.hint())
-                                    .size(9.5)
-                                    .color(palette.muted),
-                            );
-                            ui.add_space(6.0);
-                            ui.horizontal(|ui| {
-                                if widgets::ghost_button(ui, "Reset band", &palette).clicked() {
-                                    reset = true;
-                                }
-                                if widgets::ghost_button(ui, "Solo", &palette)
-                                    .on_hover_text("Temporarily hear only this band")
-                                    .clicked()
+        egui::Frame::none()
+            .fill(palette.panel)
+            .stroke(Stroke::new(1.0_f32, palette.border))
+            .rounding(theme::CARD_RADIUS)
+            .inner_margin(egui::Margin::same(10.0))
+            .show(ui, |ui| match band_index {
+                Some(index) => {
+                    if let Some(band) = self.preset.speakers[speaker_index].bands.get_mut(index) {
+                        egui::Grid::new("band-editor")
+                            .num_columns(2)
+                            .spacing([8.0, 6.0])
+                            .show(ui, |ui| {
+                                ui.label(
+                                    RichText::new("Frequency").size(11.0).color(palette.muted),
+                                );
+                                let mut freq = band.freq_hz;
+                                if ui
+                                    .add(
+                                        egui::DragValue::new(&mut freq)
+                                            .speed(1.0)
+                                            .range(MIN_FREQ_HZ..=MAX_FREQ_HZ)
+                                            .suffix(" Hz")
+                                            .fixed_decimals(0),
+                                    )
+                                    .changed()
                                 {
-                                    // Soloing flips every other band off; undo restores.
+                                    band.freq_hz = freq;
                                     changed = true;
                                 }
+                                ui.end_row();
+
+                                ui.label(RichText::new("Gain").size(11.0).color(palette.muted));
+                                if ui
+                                    .add(
+                                        egui::DragValue::new(&mut band.gain_db)
+                                            .speed(0.1)
+                                            .range(-30.0..=30.0)
+                                            .suffix(" dB")
+                                            .fixed_decimals(1),
+                                    )
+                                    .changed()
+                                {
+                                    changed = true;
+                                }
+                                ui.end_row();
+
+                                ui.label(RichText::new("Quality").size(11.0).color(palette.muted));
+                                if ui
+                                    .add(
+                                        egui::DragValue::new(&mut band.q)
+                                            .speed(0.01)
+                                            .range(0.1..=40.0)
+                                            .fixed_decimals(2),
+                                    )
+                                    .changed()
+                                {
+                                    changed = true;
+                                }
+                                ui.end_row();
+
+                                ui.label(RichText::new("Filter").size(11.0).color(palette.muted));
+                                egui::ComboBox::from_id_salt("filter-type")
+                                    .selected_text(band.filter.label())
+                                    .width(150.0)
+                                    .show_ui(ui, |ui| {
+                                        for filter in FilterType::ALL {
+                                            if ui
+                                                .selectable_value(
+                                                    &mut band.filter,
+                                                    filter,
+                                                    filter.label(),
+                                                )
+                                                .clicked()
+                                            {
+                                                changed = true;
+                                            }
+                                        }
+                                    });
+                                ui.end_row();
+
+                                ui.label(RichText::new("Enabled").size(11.0).color(palette.muted));
+                                if widgets::switch(ui, &mut band.enabled, &palette).clicked() {
+                                    changed = true;
+                                }
+                                ui.end_row();
                             });
-                        } else {
-                            ui.label(
-                                RichText::new("Select a band on the graph")
-                                    .size(11.0)
-                                    .color(palette.muted),
-                            );
-                        }
-                    }
-                    None => {
+
+                        ui.add_space(4.0);
+                        ui.label(
+                            RichText::new(band.filter.hint())
+                                .size(9.5)
+                                .color(palette.muted),
+                        );
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            if widgets::ghost_button(ui, "Reset band", &palette).clicked() {
+                                reset = true;
+                            }
+                            if widgets::ghost_button(ui, "Solo", &palette)
+                                .on_hover_text(
+                                    "Hear only this band; press again to restore the rest",
+                                )
+                                .clicked()
+                            {
+                                solo = true;
+                            }
+                        });
+                    } else {
                         ui.label(
                             RichText::new("Select a band on the graph")
                                 .size(11.0)
                                 .color(palette.muted),
                         );
                     }
+                }
+                None => {
+                    ui.label(
+                        RichText::new("Select a band on the graph")
+                            .size(11.0)
+                            .color(palette.muted),
+                    );
                 }
             });
 
@@ -1482,6 +1538,17 @@ impl PeaceApp {
                     band.filter = FilterType::Peak;
                     self.dirty = true;
                 }
+            }
+        }
+        if solo {
+            self.push_history();
+            if let Some(index) = band_index {
+                if self.preset.toggle_solo(speaker_index, index) {
+                    self.status("Solo: only this band is active", StatusKind::Info);
+                } else {
+                    self.status("All bands are active again", StatusKind::Info);
+                }
+                self.dirty = true;
             }
         }
 

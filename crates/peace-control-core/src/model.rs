@@ -745,3 +745,66 @@ mod tests {
         assert!(effects.any_active());
     }
 }
+
+impl Preset {
+    /// Solos one band of one speaker bank: every other band in that bank is
+    /// disabled so the rendered configuration contains only this filter.
+    /// Calling it again when the bank is already soloed re-enables every band,
+    /// which keeps the action reversible from the same control.
+    ///
+    /// Returns `true` when the bank ended up soloed.
+    pub fn toggle_solo(&mut self, bank: usize, index: usize) -> bool {
+        let Some(speaker) = self.speakers.get_mut(bank) else {
+            return false;
+        };
+        if index >= speaker.bands.len() {
+            return false;
+        }
+        let already_soloed = speaker.bands.iter().enumerate().all(|(position, band)| {
+            if position == index {
+                band.enabled
+            } else {
+                !band.enabled
+            }
+        });
+        if already_soloed {
+            for band in &mut speaker.bands {
+                band.enabled = true;
+            }
+            false
+        } else {
+            for (position, band) in speaker.bands.iter_mut().enumerate() {
+                band.enabled = position == index;
+            }
+            true
+        }
+    }
+}
+
+#[cfg(test)]
+mod solo_tests {
+    use super::*;
+
+    #[test]
+    fn solo_disables_the_other_bands_and_toggles_back() {
+        let mut preset = Preset::with_bands(5);
+        assert!(preset.toggle_solo(0, 2));
+        let enabled: Vec<usize> = preset.speakers[0]
+            .bands
+            .iter()
+            .enumerate()
+            .filter(|(_, band)| band.enabled)
+            .map(|(index, _)| index)
+            .collect();
+        assert_eq!(enabled, vec![2]);
+        assert!(!preset.toggle_solo(0, 2));
+        assert!(preset.speakers[0].bands.iter().all(|band| band.enabled));
+    }
+
+    #[test]
+    fn solo_ignores_missing_banks_and_bands() {
+        let mut preset = Preset::with_bands(3);
+        assert!(!preset.toggle_solo(9, 0));
+        assert!(!preset.toggle_solo(0, 9));
+    }
+}

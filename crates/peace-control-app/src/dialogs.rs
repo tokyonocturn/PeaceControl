@@ -18,6 +18,7 @@ pub fn show_all(app: &mut PeaceApp, ctx: &egui::Context) {
     backups(app, ctx);
     help(app, ctx);
     recovery(app, ctx);
+    confirm_close(app, ctx);
 }
 
 fn window_frame(palette: &theme::Palette) -> egui::Frame {
@@ -151,6 +152,54 @@ fn effects(app: &mut PeaceApp, ctx: &egui::Context) {
                                 &mut surround.subwoofer_level,
                                 0.0..=2.0,
                                 "",
+                                &palette,
+                            );
+                            changed |= param_row(
+                                ui,
+                                "Front level",
+                                &mut surround.front_level,
+                                0.0..=2.0,
+                                "",
+                                &palette,
+                            );
+                            changed |= param_row(
+                                ui,
+                                "Centre level",
+                                &mut surround.center_level,
+                                0.0..=2.0,
+                                "",
+                                &palette,
+                            );
+                            changed |= param_row(
+                                ui,
+                                "Side level",
+                                &mut surround.side_level,
+                                0.0..=2.0,
+                                "",
+                                &palette,
+                            );
+                            changed |= param_row(
+                                ui,
+                                "Front delay",
+                                &mut surround.front_delay_ms,
+                                0.0..=30.0,
+                                " ms",
+                                &palette,
+                            );
+                            changed |= param_row(
+                                ui,
+                                "Subwoofer delay",
+                                &mut surround.subwoofer_delay_ms,
+                                0.0..=30.0,
+                                " ms",
+                                &palette,
+                            );
+                            changed |= param_row(
+                                ui,
+                                "Bass crossover",
+                                &mut surround.bass_frequency_hz,
+                                40.0..=400.0,
+                                " Hz",
                                 &palette,
                             );
                         }
@@ -289,6 +338,13 @@ fn effects_block(ui: &mut egui::Ui, effects: &mut Effects, palette: &theme::Pale
         &mut effects.swap_speakers,
         palette,
     );
+    changed |= widgets::toggle_row(
+        ui,
+        "Reverse channel order",
+        "Writes the channels back to front, so the left channel plays on the right.",
+        &mut effects.reverse_channels,
+        palette,
+    );
 
     ui.add_space(6.0);
     widgets::section_title(ui, "Time and space", palette);
@@ -310,12 +366,28 @@ fn effects_block(ui: &mut egui::Ui, effects: &mut Effects, palette: &theme::Pale
     if effects.echo {
         changed |= param_row(
             ui,
-            "Echoes",
+            "Echo delay",
             &mut effects.echo_delay_ms,
             40.0..=1200.0,
             " ms",
             palette,
         );
+        ui.horizontal(|ui| {
+            ui.set_min_width(150.0);
+            ui.label(
+                RichText::new("Echo repeats")
+                    .size(11.5)
+                    .color(palette.muted),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .add(egui::DragValue::new(&mut effects.echo_count).range(1..=4))
+                    .changed()
+                {
+                    changed = true;
+                }
+            });
+        });
     }
 
     ui.add_space(6.0);
@@ -539,6 +611,36 @@ fn settings(app: &mut PeaceApp, ctx: &egui::Context) {
                         &mut app.settings.preamp_in_graph,
                         &palette,
                     );
+                    settings_changed |= widgets::toggle_row(
+                        ui,
+                        "Confirm before closing",
+                        "Ask before discarding an unsaved configuration.",
+                        &mut app.settings.confirm_on_exit,
+                        &palette,
+                    );
+                    ui.horizontal(|ui| {
+                        ui.label(RichText::new("Log level").size(11.5).color(palette.muted));
+                        egui::ComboBox::from_id_salt("log-level")
+                            .selected_text(app.settings.log_level.clone())
+                            .width(110.0)
+                            .show_ui(ui, |ui| {
+                                for level in ["error", "warn", "info", "debug", "trace"] {
+                                    if ui
+                                        .selectable_label(app.settings.log_level == level, level)
+                                        .clicked()
+                                    {
+                                        app.settings.log_level = level.to_string();
+                                        peace_control_core::logging::set_level(level);
+                                        settings_changed = true;
+                                    }
+                                }
+                            });
+                        ui.label(
+                            RichText::new("Applied to the log file immediately.")
+                                .size(9.5)
+                                .color(palette.muted),
+                        );
+                    });
 
                     ui.add_space(10.0);
                     ui.separator();
@@ -973,6 +1075,54 @@ fn help(app: &mut PeaceApp, ctx: &egui::Context) {
             });
         });
     app.windows.help = open;
+}
+
+fn confirm_close(app: &mut PeaceApp, ctx: &egui::Context) {
+    if !app.windows.confirm_close {
+        return;
+    }
+    let palette = app.palette;
+    let mut decision: Option<bool> = None;
+    egui::Window::new("Unsaved changes")
+        .id(egui::Id::new("confirm-close-window"))
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .frame(window_frame(&palette))
+        .show(ctx, |ui| {
+            header(
+                ui,
+                "Save this configuration?",
+                "The window is closing and the current configuration has unsaved changes.",
+                &palette,
+            );
+            ui.label(
+                RichText::new(format!("“{}”", app.preset.name))
+                    .size(11.5)
+                    .color(palette.text),
+            );
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                if widgets::primary_button(ui, "Save and close", true, &palette).clicked() {
+                    decision = Some(true);
+                }
+                if widgets::ghost_button(ui, "Close without saving", &palette).clicked() {
+                    decision = Some(false);
+                }
+                if widgets::ghost_button(ui, "Keep editing", &palette).clicked() {
+                    app.windows.confirm_close = false;
+                    decision = None;
+                }
+            });
+        });
+    if let Some(save) = decision {
+        if save {
+            app.save_preset();
+        }
+        app.windows.confirm_close = false;
+        app.allow_close = true;
+        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+    }
 }
 
 fn recovery(app: &mut PeaceApp, ctx: &egui::Context) {

@@ -15,14 +15,23 @@ use std::sync::Mutex;
 const MAX_LOG_BYTES: u64 = 512 * 1024;
 const KEEP_FILES: usize = 3;
 
+/// The active level, kept in a shared cell so it can change at runtime.
+static LEVEL: Mutex<LevelFilter> = Mutex::new(LevelFilter::Info);
+
+fn current_level() -> LevelFilter {
+    LEVEL
+        .lock()
+        .map(|level| *level)
+        .unwrap_or(LevelFilter::Info)
+}
+
 struct FileLogger {
     file: Mutex<std::fs::File>,
-    level: LevelFilter,
 }
 
 impl log::Log for FileLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= self.level
+        metadata.level() <= current_level()
     }
 
     fn log(&self, record: &Record) {
@@ -68,6 +77,27 @@ fn rotate(path: &Path) {
     let _ = std::fs::rename(path, path.with_extension("log.1"));
 }
 
+/// Maps a setting value onto a log level. Unknown values fall back to `info`.
+pub fn parse_level(level: &str) -> LevelFilter {
+    match level.to_ascii_lowercase().as_str() {
+        "trace" => LevelFilter::Trace,
+        "debug" => LevelFilter::Debug,
+        "warn" | "warning" => LevelFilter::Warn,
+        "error" => LevelFilter::Error,
+        "off" => LevelFilter::Off,
+        _ => LevelFilter::Info,
+    }
+}
+
+/// Changes the log level of the running application.
+pub fn set_level(level: &str) {
+    let level = parse_level(level);
+    if let Ok(mut current) = LEVEL.lock() {
+        *current = level;
+    }
+    log::set_max_level(level);
+}
+
 /// Installs the global logger. Calling it twice is harmless.
 pub fn init(log_dir: &Path, level: &str) -> Result<PathBuf> {
     fsutil::ensure_dir(log_dir)?;
@@ -80,18 +110,13 @@ pub fn init(log_dir: &Path, level: &str) -> Result<PathBuf> {
         .open(&path)
         .map_err(|error| crate::Error::io_write(&path, error))?;
 
-    let level = match level.to_ascii_lowercase().as_str() {
-        "trace" => LevelFilter::Trace,
-        "debug" => LevelFilter::Debug,
-        "warn" | "warning" => LevelFilter::Warn,
-        "error" => LevelFilter::Error,
-        "off" => LevelFilter::Off,
-        _ => LevelFilter::Info,
-    };
+    let level = parse_level(level);
+    if let Ok(mut current) = LEVEL.lock() {
+        *current = level;
+    }
 
     let logger = FileLogger {
         file: Mutex::new(file),
-        level,
     };
 
     if log::set_boxed_logger(Box::new(logger)).is_ok() {
@@ -135,6 +160,16 @@ mod tests {
         let tail = read_tail(&dir, 2);
         assert_eq!(tail, "two\nthree");
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn levels_parse_from_settings_values() {
+        assert_eq!(parse_level("DEBUG"), LevelFilter::Debug);
+        assert_eq!(parse_level("warning"), LevelFilter::Warn);
+        assert_eq!(parse_level("nonsense"), LevelFilter::Info);
+        set_level("debug");
+        assert_eq!(current_level(), LevelFilter::Debug);
+        set_level("info");
     }
 
     #[test]

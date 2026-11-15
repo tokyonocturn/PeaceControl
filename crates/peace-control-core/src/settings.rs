@@ -54,12 +54,10 @@ pub struct Settings {
     pub max_backups: usize,
     pub confirm_on_exit: bool,
     pub start_with_windows: bool,
-    pub show_tooltips: bool,
     pub window_width: f32,
     pub window_height: f32,
     pub last_preset: Option<String>,
     pub recent_presets: Vec<String>,
-    pub language: String,
     pub log_level: String,
 }
 
@@ -79,12 +77,10 @@ impl Default for Settings {
             max_backups: 12,
             confirm_on_exit: false,
             start_with_windows: false,
-            show_tooltips: true,
             window_width: 1180.0,
             window_height: 760.0,
             last_preset: None,
             recent_presets: Vec::new(),
-            language: "en".to_string(),
             log_level: "info".to_string(),
         }
     }
@@ -100,6 +96,12 @@ impl Settings {
         settings.window_width = settings.window_width.clamp(720.0, 10000.0);
         settings.window_height = settings.window_height.clamp(480.0, 10000.0);
         settings.recent_presets.truncate(12);
+        settings.log_level = match settings.log_level.to_ascii_lowercase().as_str() {
+            "error" | "warn" | "info" | "debug" | "trace" => {
+                settings.log_level.to_ascii_lowercase()
+            }
+            _ => "info".to_string(),
+        };
         settings
     }
 
@@ -197,10 +199,12 @@ mod tests {
         settings.graph_range_db = 500.0;
         settings.default_band_count = 0;
         settings.recent_presets = (0..30).map(|i| format!("p{i}")).collect();
+        settings.log_level = "verbose".to_string();
         let sanitized = settings.sanitized();
         assert_eq!(sanitized.graph_range_db, 48.0);
         assert_eq!(sanitized.default_band_count, 1);
         assert_eq!(sanitized.recent_presets.len(), 12);
+        assert_eq!(sanitized.log_level, "info");
     }
 
     #[test]
